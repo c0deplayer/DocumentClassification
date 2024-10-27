@@ -11,6 +11,7 @@ analizy i kategoryzacji różnorodnych dokumentów.
 
 Celem projektu jest stworzenie skalowalnego, wydajnego systemu klasyfikacji i analizy dokumentów w środowisku chmurowym,
 wykorzystującego zaawansowane techniki uczenia maszynowego.
+
 ---
 
 ## Wymagania funkcjonalne
