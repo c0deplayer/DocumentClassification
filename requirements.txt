@@ -2,7 +2,13 @@
 # Please do not edit it manually.
 
 easyocr>=1.7.2
-huggingface-hub[torch]>=0.26.1
+fastapi[standard]>=0.115.3
+numpy>=2.1.2
+pdf2image>=1.17.0
+pillow>=11.0.0
+python-multipart>=0.0.16
+rich>=13.9.3
 torch>=2.5.0
 torchaudio>=2.5.0
 torchvision>=0.20.0
+transformers>=4.46.0
