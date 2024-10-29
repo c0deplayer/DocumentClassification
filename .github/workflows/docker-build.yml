@@ -1,0 +1,43 @@
+name: Build and Push Docker Images
+on:
+  push:
+    branches:
+      - 'main'
+  schedule:
+    - cron: '30 16 * * *'
+
+jobs:
+  push_to_docker_hub:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - image: c0deplayer/dc-ocr
+            dockerfile: ./Dockerfile.ocr
+          - image: c0deplayer/dc-process
+            dockerfile: ./Dockerfile.process
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ matrix.image }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
