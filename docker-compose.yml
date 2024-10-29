@@ -1,16 +1,13 @@
-version: '3'
 services:
   ocr:
     container_name: ocr_service
-    build:
-      dockerfile: Dockerfile.ocr
+    image: c0deplayer/dc-ocr:main
     ports:
       - "8080:8080"
 
   processor:
     container_name: processor_service
-    build:
-      dockerfile: Dockerfile.processor
+    image: c0deplayer/dc-processor:main
     ports:
       - "9090:9090"
     depends_on:
