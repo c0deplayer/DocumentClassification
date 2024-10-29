@@ -1,4 +1,4 @@
-# Klasyfikacja Dokumentów w Chmurze Obliczeniowej
+# Klasyfikacja Dokumentów
 
 [![en](https://img.shields.io/badge/lang-en-green.svg)](./README.en.md)
 [![pdm-managed](https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fpdm-project%2F.github%2Fbadge.json)](https://pdm-project.org)
@@ -11,6 +11,20 @@ analizy i kategoryzacji różnorodnych dokumentów.
 
 Celem projektu jest stworzenie skalowalnego, wydajnego systemu klasyfikacji i analizy dokumentów w środowisku chmurowym,
 wykorzystującego zaawansowane techniki uczenia maszynowego.
+
+---
+
+## Wymagane biblioteki
+
+> [!IMPORTANT]
+> Minimalna wspierana wersja Python to 3.12.
+
+Wszystkie wymagane biblioteki znajdują się w pliku `pyproject.toml` oraz `requirements.txt`. Aby zainstalować wszystkie
+zależności, należy uruchomić poniższą komendę:
+
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
@@ -77,7 +91,7 @@ wykorzystującego zaawansowane techniki uczenia maszynowego.
 
 #### Dokumenty tekstowe
 
-* Formaty: PDF, DOCX, TXT
+* Formaty: PDF
 * Maksymalny rozmiar: 20MB
 * Limit stron: 5
 
@@ -115,7 +129,7 @@ wykorzystującego zaawansowane techniki uczenia maszynowego.
 * Czas przetwarzania:
     - Generowanie opisu: maksymalnie 10 sekund
     - Klasyfikacja dokumentu: maksymalnie 10 sekund
-    - OCR: maksymalnie 15 sekund na stronę
+    - OCR: maksymalnie 10 sekund na stronę
 
 ---
 

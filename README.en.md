@@ -1,4 +1,4 @@
-# Document Classification in Cloud Computing
+# Document Classification
 
 [![pdm-managed](https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fpdm-project%2F.github%2Fbadge.json)](https://pdm-project.org)
 
@@ -10,6 +10,21 @@ categorizing various types of documents.
 
 The goal is to create a scalable and efficient document classification and analysis system within a cloud environment,
 leveraging advanced machine learning techniques.
+
+---
+
+## Required Libraries
+
+> [!IMPORTANT]
+> The minimum supported Python version is 3.12.
+
+All required libraries are listed in the `pyproject.toml` and `requirements.txt` files. To install all dependencies, run
+the
+following command:
+
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
@@ -74,7 +89,7 @@ leveraging advanced machine learning techniques.
 
 #### Text Documents
 
-- Formats: PDF, DOCX, TXT
+- Formats: PDF
 - Maximum size: 20MB
 - Page limit: 5
 
@@ -110,7 +125,7 @@ leveraging advanced machine learning techniques.
 - Processing time:
     - Description generation: max 10 seconds
     - Document classification: max 10 seconds
-    - OCR: max 15 seconds per page
+    - OCR: max 10 seconds per page
 
 ---
 
