@@ -6,6 +6,7 @@ from pathlib import Path
 
 import easyocr
 import numpy as np
+import requests
 from PIL import Image
 from fastapi import FastAPI, UploadFile, HTTPException, status
 from pdf2image import convert_from_bytes
@@ -124,7 +125,7 @@ def create_bounding_box(bbox_data: list[tuple[float, float]]) -> list[int]:
 @app.post("/ocr")
 async def read_text_from_file(
     file: UploadFile,
-) -> dict[str, list[dict[str, list[int] | str] | bytes]]:
+) -> None:  # dict[str, list[dict[str, list[int] | str] | bytes]]
     logger.info("Received file for OCR: %s", file.filename)
 
     validate_file(file)
@@ -135,7 +136,10 @@ async def read_text_from_file(
 
     img_bytes = convert_images_to_bytes(images)
 
-    return {
-        "ocr_result": ocr_result,
-        "images": [base64.b64encode(img) for img in img_bytes],
-    }
+    requests.post(
+        "http://processor:9090/process",
+        json={
+            "ocr_result": ocr_result,
+            "images": [base64.b64encode(img).decode("utf-8") for img in img_bytes],
+        },
+    )
