@@ -14,8 +14,8 @@ jobs:
         include:
           - image: c0deplayer/dc-ocr
             dockerfile: ./Dockerfile.ocr
-          - image: c0deplayer/dc-process
-            dockerfile: ./Dockerfile.process
+          - image: c0deplayer/dc-processor
+            dockerfile: ./Dockerfile.processor
 
     steps:
       - name: Checkout
