@@ -1,5 +1,4 @@
 import base64
-import concurrent.futures
 import io
 import logging
 from datetime import datetime
@@ -7,15 +6,14 @@ from pathlib import Path
 
 import easyocr
 import numpy as np
-import requests
 from PIL import Image
 from fastapi import FastAPI, UploadFile, HTTPException, status
-from fastapi.testclient import TestClient
 from pdf2image import convert_from_bytes
 from pdf2image.exceptions import PDFPageCountError
 from rich.progress import track
 
-Path("logs/ocr").mkdir(parents=True, exist_ok=True)
+log_dir = Path("logs/ocr")
+log_dir.mkdir(parents=True, exist_ok=True)
 
 current_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -24,7 +22,7 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
-        logging.FileHandler(f"logs/ocr/{current_date}.log"),
+        logging.FileHandler(f"{log_dir}/{current_date}.log", mode="a"),
         logging.StreamHandler(),
     ],
 )
@@ -62,7 +60,7 @@ def validate_file(file: UploadFile) -> None:
     if file.content_type == "application/pdf":
         try:
             page_count = len(convert_from_bytes(file.file.read()))
-            if page_count > 12:
+            if page_count > 5:
                 logger.error("PDF has more than 5 pages: %d pages", page_count)
 
                 raise HTTPException(
@@ -95,50 +93,32 @@ def convert_file_to_image(file: UploadFile) -> list[Image]:
 def convert_images_to_bytes(images: list[Image]) -> list[bytes]:
     logger.info("Converting images to bytes")
 
-    image_bytes_list = []
+    images_bytes_list = []
     for img in images:
         img_bytes = io.BytesIO()
         img.save(img_bytes, format="PNG")
-        image_bytes_list.append(img_bytes.getvalue())
+        images_bytes_list.append(img_bytes.getvalue())
 
-    return image_bytes_list
+    return images_bytes_list
 
 
 def recognize_text_from_image(
-    image: list[Image],
+    images: list[Image],
 ) -> list[dict[str, list[int] | str]]:
     logger.info("Recognizing text from image")
 
     ocr_result = []
-    texts = []
 
-    for img in track(image, description="Recognizing text..."):
-        texts.extend(reader.readtext(np.array(img)))
+    for img in track(images, description="Recognizing text..."):
+        for bbox, word, _ in reader.readtext(np.array(img)):
+            ocr_result.append({"bounding_box": create_bounding_box(bbox), "word": word})
 
-    for bbox, word, confidence in texts:
-        ocr_result.append(
-            {
-                "bounding_box": create_bounding_box(bbox),
-                "word": word,
-            }
-        )
     return ocr_result
 
 
 def create_bounding_box(bbox_data: list[tuple[float, float]]) -> list[int]:
-    xs = []
-    ys = []
-
-    for x, y in bbox_data:
-        xs.append(x)
-        ys.append(y)
-
-    left = int(min(xs))
-    top = int(min(ys))
-    right = int(max(xs))
-    bottom = int(max(ys))
-
-    return [left, top, right, bottom]
+    xs, ys = zip(*bbox_data)
+    return [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
 
 
 @app.post("/ocr")
