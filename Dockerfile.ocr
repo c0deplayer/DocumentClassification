@@ -2,10 +2,19 @@ FROM python:3.12
 LABEL authors="codeplayer"
 
 WORKDIR /code
+
+# Configure apt and install packages
+RUN apt-get update -y && \
+  apt-get install -y \
+  # cleanup
+  && apt-get autoremove -y \
+  && apt-get clean -y \
+  && rm -rf /var/lib/apt/lists
+
 COPY ./requirements.txt /code/requirements.txt
 
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY ./src/documentclassification/ocr/ /code/documentclassification/ocr/
 
-CMD ["fastapi", "run", "documentclassification/ocr/ocr.py", "--port", "8080"]
+CMD ["uvicorn", "documentclassification.ocr.ocr:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -2,10 +2,19 @@ FROM python:3.12
 LABEL authors="codeplayer"
 
 WORKDIR /code
+
+# Configure apt and install packages
+RUN apt-get update -y && \
+  apt-get install -y \
+  # cleanup
+  && apt-get autoremove -y \
+  && apt-get clean -y \
+  && rm -rf /var/lib/apt/lists
+
 COPY ./requirements.txt /code/requirements.txt
 
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY ./src/documentclassification/process/ /code/documentclassification/process/
 
-CMD ["fastapi", "run", "documentclassification/process/process.py", "--port", "9090"]
+CMD ["uvicorn", "documentclassification.process.process:app", "--host", "0.0.0.0", "--port", "9090"]
