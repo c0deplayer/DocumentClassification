@@ -1,5 +1,13 @@
 name: Lint and Commit
-on: [ push, pull_request ]
+on:
+  push:
+    paths:
+      - '**.py'
+    branches:
+      - main
+  pull_request:
+    paths:
+      - '**.py'
 
 jobs:
   lint:

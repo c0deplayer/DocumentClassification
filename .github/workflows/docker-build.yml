@@ -1,8 +1,10 @@
 name: Build and Push Docker Images
 on:
   push:
+    paths:
+      - '**.py'
     branches:
-      - 'main'
+      - main
   schedule:
     - cron: '30 16 * * *'
 
