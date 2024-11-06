@@ -5,24 +5,32 @@ from datetime import datetime
 from pathlib import Path
 
 import torchvision.transforms.v2 as v2
-from PIL import Image
 from fastapi import FastAPI
+from PIL import Image
 from transformers import (
-    LayoutLMv3Processor,
     LayoutLMv3ImageProcessor,
+    LayoutLMv3Processor,
     LayoutLMv3TokenizerFast,
 )
 
-log_dir = Path("logs/process")
-log_dir.mkdir(parents=True, exist_ok=True)
+# Constants
+LOG_DIR = Path("logs/process")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
 
-current_date = datetime.now().strftime("%Y-%m-%d")
+CURRENT_DATE = datetime.now().strftime("%Y-%m-%d")
+LOG_FILE = LOG_DIR / f"{CURRENT_DATE}.log"
+
+FILE_SIZE_LIMIT_MB = 20
+MAX_PDF_PAGES = 5
+IMAGE_TARGET_SIZE = 1000
+
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
-        logging.FileHandler(f"{log_dir}/{current_date}.log", mode="a"),
+        logging.FileHandler(LOG_FILE, mode="a"),
         logging.StreamHandler(),
     ],
 )
@@ -36,48 +44,70 @@ processor = LayoutLMv3Processor(
 transform = v2.ToPILImage()
 
 
-def scale_bounding_box(box, width_scale=1.0, height_scale=1.0) -> list[int]:
+def scale_bounding_box(
+    box: list[int], width_scale: float = 1.0, height_scale: float = 1.0
+) -> list[int]:
+    """Scales bounding box coordinates based on provided scales."""
     return [
-        int(coord * scale)
-        for coord, scale in zip(
-            box, [width_scale, height_scale, width_scale, height_scale]
-        )
+        int(coord * scale) for coord, scale in zip(box, [width_scale, height_scale] * 2)
     ]
 
 
 @app.post("/process")
 def process_text(body: dict[str, list[dict[str, list[int] | str] | bytes]]) -> None:
-    logger.info("Processing text")
+    """Processes OCR result and images for further analysis."""
+    logger.info("Starting text processing.")
 
-    images = [Image.open(io.BytesIO(base64.b64decode(img))) for img in body["images"]]
-    width, height = images[0].size
-    width_scale, height_scale = 1000 / width, 1000 / height
-
-    words, boxes = zip(
-        *[
-            (
-                row["word"],
-                scale_bounding_box(row["bounding_box"], width_scale, height_scale),
-            )
-            for row in body["ocr_result"]
+    try:
+        images = [
+            Image.open(io.BytesIO(base64.b64decode(img))).convert("RGB")
+            for img in body.get("images", [])
         ]
-    )
+        if not images:
+            logger.error("No images found in the request body.")
+            return
 
-    encoding = processor(
-        images,
-        words,
-        boxes=boxes,
-        max_length=512,
-        padding="max_length",
-        truncation=True,
-        return_tensors="pt",
-    )
+        width, height = images[0].size
+        width_scale = IMAGE_TARGET_SIZE / width
+        height_scale = IMAGE_TARGET_SIZE / height
 
-    logger.info(f"""
-        input_ids:  {list(encoding["input_ids"].squeeze().shape)}
-        word boxes: {list(encoding["bbox"].squeeze().shape)}
-        image data: {list(encoding["pixel_values"].squeeze().shape)}
-        image size: {images[0].size}
-    """)
+        ocr_results = body.get("ocr_result", [])
+        words, boxes = (
+            zip(
+                *(
+                    (
+                        item["word"],
+                        scale_bounding_box(
+                            item["bounding_box"], width_scale, height_scale
+                        ),
+                    )
+                    for item in ocr_results
+                )
+            )
+            if ocr_results
+            else ([], [])
+        )
 
-    image_data = transform(encoding["pixel_values"][0])
+        encoding = processor(
+            images,
+            words,
+            boxes=list(boxes),
+            max_length=512,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+
+        logger.info(
+            f"Encoding shapes - input_ids: {list(encoding['input_ids'].shape)}, "
+            f"bbox: {list(encoding['bbox'].shape)}, "
+            f"pixel_values: {list(encoding['pixel_values'].shape)}, "
+            f"image size: {images[0].size}"
+        )
+
+        image_data = transform(encoding["pixel_values"][0])
+        # Further processing can be done with image_data
+
+    except Exception as e:
+        logger.exception("An error occurred during text processing.")
+        raise e
