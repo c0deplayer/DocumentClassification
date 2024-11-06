@@ -4,55 +4,54 @@ import logging
 from datetime import datetime
 from pathlib import Path
 
-import easyocr
-import numpy as np
 import requests
-from PIL import Image
-from fastapi import FastAPI, UploadFile, HTTPException, status
+from fastapi import FastAPI, HTTPException, UploadFile, status
 from pdf2image import convert_from_bytes
 from pdf2image.exceptions import PDFPageCountError
-from rich.progress import track
+from PIL import Image
 
-log_dir = Path("logs/ocr")
-log_dir.mkdir(parents=True, exist_ok=True)
+from .optimized_ocr import OptimizedOCR
 
-current_date = datetime.now().strftime("%Y-%m-%d")
+LOG_DIR = Path("logs/ocr")
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+CURRENT_DATE = datetime.now().strftime("%Y-%m-%d")
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
-        logging.FileHandler(f"{log_dir}/{current_date}.log", mode="a"),
+        logging.FileHandler(LOG_DIR / f"{CURRENT_DATE}.log", mode="a"),
         logging.StreamHandler(),
     ],
 )
+
 logger = logging.getLogger(__name__)
 app = FastAPI()
-reader = easyocr.Reader(["en", "pl"], gpu=True)
-FILE_SIZE = 20971520  # 20MB
-accepted_file_types = [
+optimizer = OptimizedOCR(target_size=1024)
+FILE_SIZE_LIMIT = 20 * 1024 * 1024  # 20MB
+ACCEPTED_FILE_TYPES = {
     "image/jpeg",
     "image/png",
     "image/jpg",
+    "image/webp",
     "application/pdf",
-]
+}
 
 
 def validate_file(file: UploadFile) -> None:
-    logger.info("Validating file: %s", file.filename)
+    logger.info(f"Validating file: {file.filename}")
 
-    if file.content_type not in accepted_file_types:
-        logger.error("Unsupported file type: %s", file.content_type)
-
+    if file.content_type not in ACCEPTED_FILE_TYPES:
+        logger.error(f"Unsupported file type: {file.content_type}")
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Unsupported file type",
         )
 
-    if file.size > FILE_SIZE:
-        logger.error("File size too large: %d bytes", file.size)
-
+    if file.size > FILE_SIZE_LIMIT:
+        logger.error(f"File size too large: {file.size} bytes")
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="File size too large",
@@ -61,85 +60,73 @@ def validate_file(file: UploadFile) -> None:
     if file.content_type == "application/pdf":
         try:
             page_count = len(convert_from_bytes(file.file.read()))
-            if page_count > 5:
-                logger.error("PDF has more than 5 pages: %d pages", page_count)
-
+            if page_count > 15:
+                logger.error(f"PDF has more than 15 pages: {page_count} pages")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="PDF has more than 5 pages",
+                    detail="PDF has more than 15 pages",
                 )
         except PDFPageCountError:
             logger.error(
                 "Unable to get page count. The document stream might be empty or corrupted."
             )
-
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Unable to get page count. The document stream might be empty or corrupted.",
             )
-
-        file.file.seek(0)
-
-
-def convert_file_to_image(file: UploadFile) -> list[Image]:
-    logger.info("Converting file to image: %s", file.filename)
-
-    match file.content_type:
-        case "application/pdf":
-            return convert_from_bytes(file.file.read())
-        case "image/jpeg" | "image/png" | "image/jpg":
-            return [Image.open(file.file).convert("RGB")]
+        finally:
+            file.file.seek(0)
 
 
-def convert_images_to_bytes(images: list[Image]) -> list[bytes]:
-    logger.info("Converting images to bytes")
+def convert_file_to_image(file: UploadFile) -> list[Image.Image]:
+    logger.info(f"Converting file to image: {file.filename}")
 
-    images_bytes_list = []
+    if file.content_type == "application/pdf":
+        return convert_from_bytes(file.file.read(), fmt="jpeg")
+
+    return [Image.open(file.file)]
+
+
+def convert_images_to_base64(images: list[Image.Image]) -> list[str]:
+    """
+    Convert PIL Images to base64 strings properly.
+
+    Args:
+        images: List of PIL Image objects
+
+    Returns:
+        List of base64 encoded image strings
+    """
+    encoded_images = []
+
     for img in images:
-        img_bytes = io.BytesIO()
-        img.save(img_bytes, format="PNG")
-        images_bytes_list.append(img_bytes.getvalue())
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format="JPEG")
+        img_byte_arr = img_byte_arr.getvalue()
 
-    return images_bytes_list
+        encoded = base64.b64encode(img_byte_arr).decode("utf-8")
+        encoded_images.append(encoded)
 
-
-def recognize_text_from_image(
-    images: list[Image],
-) -> list[dict[str, list[int] | str]]:
-    logger.info("Recognizing text from image")
-
-    ocr_result = []
-
-    for img in track(images, description="Recognizing text..."):
-        for bbox, word, _ in reader.readtext(np.array(img)):
-            ocr_result.append({"bounding_box": create_bounding_box(bbox), "word": word})
-
-    return ocr_result
-
-
-def create_bounding_box(bbox_data: list[tuple[float, float]]) -> list[int]:
-    xs, ys = zip(*bbox_data)
-    return [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
+    return encoded_images
 
 
 @app.post("/ocr")
-async def read_text_from_file(
-    file: UploadFile,
-) -> None:  # dict[str, list[dict[str, list[int] | str] | bytes]]
-    logger.info("Received file for OCR: %s", file.filename)
+async def read_text_from_file(file: UploadFile) -> None:
+    logger.info(f"Received file for OCR: {file.filename}")
 
     validate_file(file)
     images = convert_file_to_image(file)
-    ocr_result = recognize_text_from_image(images)
+    logger.info(f"Processing OCR for file: {file.filename}")
+    ocr_result = optimizer.process_batch(images)
 
-    logger.info("OCR processing completed for file: %s", file.filename)
+    logger.info(f"OCR processing completed for file: {file.filename}")
 
-    img_bytes = convert_images_to_bytes(images)
+    encoded_images = convert_images_to_base64(images)
 
     requests.post(
-        "http://processor:9090/process",
+        "http://processor:9090/processor",
         json={
             "ocr_result": ocr_result,
-            "images": [base64.b64encode(img).decode("utf-8") for img in img_bytes],
+            "images": encoded_images,
         },
     )
