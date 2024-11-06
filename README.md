@@ -6,15 +6,25 @@
 
 ## Cel projektu
 
-Projekt koncentruje się na implementacji zaawansowanego systemu klasyfikacji dokumentów, wykorzystującego potencjał
-chmury obliczeniowej oraz technik uczenia maszynowego. System został zaprojektowany z myślą o automatyzacji procesów
-analizy i kategoryzacji różnorodnych dokumentów.
-
-Celem projektu jest stworzenie skalowalnego, wydajnego systemu klasyfikacji i analizy dokumentów w środowisku chmurowym,
-wykorzystującego zaawansowane techniki uczenia maszynowego.
+Projekt koncentruje się na implementacji zaawansowanego systemu klasyfikacji dokumentów, wykorzystującego potencjał chmury obliczeniowej oraz technik uczenia maszynowego. System został zaprojektowany z myślą o automatyzacji procesów analizy i kategoryzacji różnorodnych dokumentów.
 
 ---
 
+## Wykorzystane technologie
+
+### Podstawowe komponenty
+- **Framework ML**: [PyTorch 2.5.0](https://pytorch.org/)
+- **Model bazowy**: [LayoutLMv3](https://huggingface.co/microsoft/layoutlmv3-base)
+- **OCR Engine**: [EasyOCR](https://github.com/JaidedAI/EasyOCR)
+- **API Framework**: [FastAPI](https://fastapi.tiangolo.com/)
+- **Konteneryzacja**: [Docker](https://www.docker.com/) z obrazami wieloarchitekturowymi (amd64/arm64)
+
+### Narzędzia pomocnicze
+- **Zarządzanie zależnościami**: [PDM](https://pdm-project.org/en/latest/)
+- **Formatowanie kodu:** [Ruff](https://docs.astral.sh/ruff/)
+- **CI/CD:** [GitHub Actions](https://docs.github.com/en/actions)
+- **Przetwarzanie obrazów**: [Pillow](https://python-pillow.org/), [pdf2image](https://pdf2image.readthedocs.io/en/latest/index.html)
+  
 ## Wymagane biblioteki
 
 > [!IMPORTANT]
@@ -27,6 +37,11 @@ zależności, należy uruchomić poniższą komendę:
 pip install -r requirements.txt
 ```
 
+lub przy użyciu `pdm`:
+
+```bash
+pdm install
+```
 ---
 
 ## Wymagania funkcjonalne
@@ -35,26 +50,26 @@ pip install -r requirements.txt
 
 #### Obsługa dokumentów
 
-* Wsparcie dla różnorodnych formatów dokumentów
+* Wsparcie dla różnorodnych formatów dokumentów (PDF, JPEG, PNG, WEBP)
 * Przetwarzanie dokumentów w języku angielskim
-* Klasyfikacja dokumentów z niewielkim opóźnieniem
+* Klasyfikacja dokumentów z założonym opóźnieniem do 15 sekund
 
 #### Bezpieczeństwo
 
-* Szyfrowanie komunikacji klient-serwer
-* Bezpieczne przechowywanie dokumentów z szyfrowaniem end-to-end
+* Bezpieczne przechowywanie dokumentów z szyfrowaniem
+* Logowanie operacji systemowych
 
 #### Integracja i API
 
-* REST API do komunikacji z systemem
+* REST API zgodne ze standardem OpenAPI 3.0
 
-* Endpoints do:
+* Endpointy do:
     - Przesyłania dokumentów
     - Pobierania wyników klasyfikacji
     - Zarządzania dokumentami
     - Wyszukiwania i filtrowania
 
-* Dokumentacja API
+* Pełna dokumentacja API w formacie OpenAPI
 
 #### Przechowywanie danych
 
@@ -63,17 +78,21 @@ pip install -r requirements.txt
     - Wyników klasyfikacji
     - Adnotacji
 
-### Dodatkowe
+* CI/CD do automatyzacji procesu wdrożenia
+  - Wsparcie dla kontenerów wieloarchitekturowych
+  - Automatyczne budowanie obrazów Docker
+
+### Dodatkowe (opcjonalne)
 
 #### Wielojęzyczność
 
-* Obsługa dokumentów w różnych językach (minimum 3 języki)
+* Obsługa przynajmniej języka polskiego i angielskiego
 * Automatyczne wykrywanie języka dokumentu
 
 #### Analiza i przetwarzanie
 
-* Generowanie automatycznych streszczeń dokumentów
-* Ekstrakcja kluczowych słów i fraz
+* Ekstrakcja kluczowych informacji z dokumentu
+* Analiza układu dokumentu
 
 #### Interfejs użytkownika
 
@@ -86,7 +105,7 @@ pip install -r requirements.txt
 
 ---
 
-## Ograniczenia systemu [WIP]
+## Ograniczenia systemu
 
 ### Ograniczenia plików
 
@@ -94,31 +113,14 @@ pip install -r requirements.txt
 
 * Formaty: PDF
 * Maksymalny rozmiar: 20MB
-* Limit stron: 5
+* Limit stron: 8
 
 #### Obrazy i skany
 
 * Formaty zdjęć: JPEG, PNG, WEBP
     - Maksymalny rozmiar: 20MB
     - Maksymalna rozdzielczość: 2480px x 3508px
-* Formaty skanów: TIFF, BMP
-    - Maksymalna rozdzielczość: 600 DPI
-    - Minimalna rozdzielczość: 150 DPI
 * Akceptowane tryby kolorów: RGB, CMYK, skala szarości
-
-### Ograniczenia językowe
-
-#### Pełna obsługa
-
-* Języki: angielski
-* Funkcjonalności:
-    - OCR
-    - Klasyfikacja dokumentów
-    - Generowanie opisów
-
-#### Podstawowa obsługa
-
-(N/A)
 
 ### Ograniczenia przetwarzania
 
@@ -129,8 +131,8 @@ pip install -r requirements.txt
     - Maksimum: 300 słów
 * Czas przetwarzania:
     - Generowanie opisu: maksymalnie 10 sekund
-    - Klasyfikacja dokumentu: maksymalnie 10 sekund
-    - OCR: maksymalnie 10 sekund na stronę
+    - Klasyfikacja dokumentu: maksymalnie 15 sekund
+    - OCR: maksymalnie 15 sekund na stronę
 
 ---
 
@@ -138,8 +140,8 @@ pip install -r requirements.txt
 
 | Data        | Etap                            | Kluczowe zadania                                                                                                                          |
 |-------------|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
-| 8 XI 2024   | Wstępna konfiguracja środowiska | • Konfiguracja środowiska chmurowego oraz lokalnego<br>• Utworzenie repozytorium<br>• Utworzenie potoku przygotowania danych<br>• OCR<br> |
-| 22 XI 2024  | Model bazowy i baza danych      | • Implementacja podstawowej metody uczenia maszynowego<br>• Konfiguracja bazy danych<br>                                                  |
-| 6 XII 2024  | Optymalizacja modelu            | • Analiza różnych metod uczenia maszynowego<br>• Testy wydajności i dokładności<br>• Wybór optymalnego rozwiązania                        |
-| 20 XII 2024 | Rozszerzenie funkcjonalności    | • Implementacja obsługi wielu języków<br>• System generowania opisów<br>                                                                  |
+| 8 XI 2024   | Wstępna konfiguracja środowiska | • Konfiguracja środowiska i kontenerów<br>• Utworzenie repozytorium<br>• Utworzenie potoku przygotowania danych<br>• Implementacja podstawowego OCR<br> |
+| 22 XI 2024  | Model bazowy      | • Implementacja LayoutLMv3<br>• Konfiguracja bazy danych<br>• Podstawowa klasyfikacja                                                  |
+| 6 XII 2024  | Optymalizacja            | • Analiza różnych metod uczenia maszynowego<br>• Testy wydajności i dokładności<br>• Wybór optymalnego rozwiązania                        |
+| 20 XII 2024 | Rozszerzenia    | • Implementacja dodatkowych funkcji                                                                 |
 | 17 I 2025   | Interfejs użytkownika           | • Implementacja interfejsu webowego<br>• Dokumentacja końcowa                                                                             |
