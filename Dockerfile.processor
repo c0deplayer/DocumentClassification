@@ -1,7 +1,11 @@
-FROM python:3.12-slim
+FROM ghcr.io/astral-sh/uv:latest AS uv
+FROM python:3.12-slim AS python
+
 LABEL authors="codeplayer"
 
-WORKDIR /code
+ENV VIRTUAL_ENV=/opt/venv
+
+# RUN mkdir -p /app/data/logs/processor
 
 # Update and upgrade the system
 RUN apt update -y && \
@@ -11,10 +15,20 @@ RUN apt update -y && \
   && apt clean -y \
   && rm -rf /var/lib/apt/lists
 
-COPY ./requirements.txt /code/requirements.txt
+RUN  \
+  # we use a cache --mount to reuse the uv cache across builds
+  --mount=type=cache,target=/root/.cache/uv \
+  # we use a bind --mount to use the uv binary from the uv stage
+  --mount=type=bind,from=uv,source=/uv,target=/uv \
+  # we use a bind --mount to use the requirements.txt from the host instead of adding a COPY layer
+  --mount=type=bind,source=requirements.txt,target=requirements.txt \
+  /uv venv /opt/venv && \
+  /uv pip install -r requirements.txt
 
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+WORKDIR /app/code/processor
 
-COPY ./src/documentclassification/process/ /code/documentclassification/process/
+COPY src/processor/ .
+COPY src/configs/processor_config.py configs/processor_config.py
+COPY src/payload/processor_models.py payload/processor_models.py
 
-CMD ["uvicorn", "documentclassification.process.process:app", "--host", "0.0.0.0", "--port", "9090"]
+CMD ["/opt/venv/bin/python", "-m", "uvicorn", "processor:app", "--host", "0.0.0.0", "--port", "9090"]

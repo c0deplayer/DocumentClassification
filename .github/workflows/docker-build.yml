@@ -18,6 +18,8 @@ jobs:
             dockerfile: ./Dockerfile.ocr
           - image: c0deplayer/dc-processor
             dockerfile: ./Dockerfile.processor
+          - image: c0deplayer/dc-predictor
+            dockerfile: ./Dockerfile.predictor
 
     steps:
       - name: Checkout

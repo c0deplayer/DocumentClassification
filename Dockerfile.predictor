@@ -1,17 +1,13 @@
 FROM ghcr.io/astral-sh/uv:latest AS uv
 FROM python:3.12-slim AS python
 
-LABEL authors="codeplayer"
-
 ENV VIRTUAL_ENV=/opt/venv
 
-WORKDIR /app/data/ocr
+WORKDIR /app/data/predictor
 
 # Update and upgrade the system
 RUN apt update -y && \
   apt upgrade -y \
-  # Install required packages
-  && apt install poppler-utils -y \
   # cleanup
   && apt autoremove -y \
   && apt clean -y \
@@ -27,10 +23,10 @@ RUN  \
   /uv venv /opt/venv && \
   /uv pip install -r requirements.txt
 
-WORKDIR /app/code/ocr
+WORKDIR /app/code/predictor
 
-COPY src/ocr/ .
-COPY src/configs/ocr_config.py configs/ocr_config.py
-COPY src/payload/ocr_models.py payload/ocr_models.py
+COPY src/predictor/ .
+COPY src/configs/model_config.py configs/model_config.py
+COPY src/payload/model_models.py payload/model_models.py
 
-CMD ["/opt/venv/bin/python", "-m", "uvicorn", "ocr:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["/opt/venv/bin/python","-m", "uvicorn", "model:app", "--host", "0.0.0.0", "--port", "7070"]

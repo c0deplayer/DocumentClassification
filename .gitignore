@@ -162,5 +162,7 @@ cython_debug/
 #.idea/
 
 # Other
+.DS_Store
 logs/
 __*.py
+models/
