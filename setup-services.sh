@@ -1,28 +1,38 @@
 #!/bin/bash
 
-# Usage: ./setup.sh [--force|-f]
-# Options:
-#   --force, -f    Remove existing models and clone again
+# Usage function
+usage() {
+    echo "Usage: $0 [-f|--force] [-p|--password PASSWORD]"
+    echo "Options:"
+    echo "  -f, --force      Remove existing models and clone again"
+    echo "  -p, --password   Set PostgreSQL password"
+    exit 1
+}
 
 # Initialize FORCE flag
 FORCE=false
+POSTGRES_PASSWORD=""
 
 export DOCKER_DEFAULT_PLATFORM=linux/arm64
 
-# Parse command line arguments
+# Parse arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -f|--force)
-            FORCE=true
-            ;;
-        *)
-            echo "Unknown parameter: $1"
-            echo "Usage: ./setup.sh [--force|-f]"
-            exit 1
-            ;;
+        -f|--force) FORCE=true ;;
+        -p|--password) POSTGRES_PASSWORD="$2"; shift ;;
+        -h|--help) usage ;;
+        *) echo "Unknown parameter: $1"; usage ;;
     esac
     shift
 done
+
+# Check for password in .env
+if [ -z "$POSTGRES_PASSWORD" ] && [ -f ".env" ]; then
+    source .env
+    POSTGRES_PASSWORD=${DB_PASSWORD:-$POSTGRES_PASSWORD}
+fi
+
+export POSTGRES_PASSWORD
 
 # Check if any docker containers exist and stop them
 if [ "$(docker ps -q)" ]; then
