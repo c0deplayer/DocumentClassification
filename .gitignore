@@ -166,4 +166,5 @@ cython_debug/
 .DS_Store
 logs/
 __*.py
+!__init__.py
 models/
