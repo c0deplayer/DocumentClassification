@@ -1,13 +1,47 @@
 services:
+  database:
+    container_name: database_service
+    image: postgres:latest
+    restart: always
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: document_classification
+      TZ: Europe/Warsaw
+    ports:
+      - "5432:5432"
+    networks:
+      - document-classification
+    volumes:
+      - type: bind
+        source: logs
+        target: /app/data/logs
+      - type: volume
+        source: db
+        target: /var/lib/postgresql/data
+      - type: bind
+        source: ./db/init.sql
+        target: /docker-entrypoint-initdb.d/create_tables.sql
+
   ocr:
     container_name: ocr_service
     image: c0deplayer/dc-ocr:main
     # build:
     #   dockerfile: Dockerfile.ocr
+    environment:
+      TZ: Europe/Warsaw
     ports:
       - "8080:8080"
     networks:
       - document-classification
+    depends_on:
+      database:
+        condition: service_healthy
     volumes:
       - type: bind
         source: logs
@@ -21,6 +55,8 @@ services:
     image: c0deplayer/dc-processor:main
     # build:
     #   dockerfile: Dockerfile.processor
+    environment:
+      TZ: Europe/Warsaw
     ports:
       - "9090:9090"
     networks:
@@ -34,19 +70,21 @@ services:
       - type: bind
         source: models
         target: /app/data/models
-  
 
   predictor:
     container_name: predictor_service
     image: c0deplayer/dc-predictor:main
     # build:
     #   dockerfile: Dockerfile.predictor
+    environment:
+      TZ: Europe/Warsaw
     ports:
       - "7070:7070"
     networks:
       - document-classification
     depends_on:
       - processor
+      - database
     volumes:
       - type: bind
         source: logs
@@ -55,7 +93,9 @@ services:
         source: models
         target: /app/data/models
 
-
+volumes:
+  db:
+    driver: local
 
 networks:
   document-classification:

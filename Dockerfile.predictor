@@ -27,6 +27,9 @@ WORKDIR /app/code/predictor
 
 COPY src/predictor/ .
 COPY src/configs/model_config.py configs/model_config.py
+COPY src/configs/database_config.py configs/database_config.py
 COPY src/payload/model_models.py payload/model_models.py
+COPY src/database/ database/
+COPY .env .
 
 CMD ["/opt/venv/bin/python","-m", "uvicorn", "model:app", "--host", "0.0.0.0", "--port", "7070"]

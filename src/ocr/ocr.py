@@ -2,15 +2,17 @@ import base64
 import io
 import logging
 from datetime import datetime
+from typing import AsyncGenerator
 
 import requests
-from fastapi import FastAPI, HTTPException, UploadFile, status
+from fastapi import Depends, FastAPI, HTTPException, UploadFile, status
 from optimized_ocr import OptimizedOCR
 from pdf2image import convert_from_bytes
 from pdf2image.exceptions import PDFPageCountError
 from PIL import Image
 
 from configs.ocr_config import OCRConfig
+from database import DocumentCreate, DocumentError, DocumentRepository, get_repository
 
 config = OCRConfig()
 config.LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -36,6 +38,10 @@ optimizer = OptimizedOCR(config=config)
 
 class OCRProcessor:
     """Handle OCR processing operations."""
+
+    def __init__(self, document_repository: DocumentRepository):
+        """Initialize OCR processor with repository."""
+        self.repository = document_repository
 
     @staticmethod
     def validate_file(file: UploadFile) -> None:
@@ -99,13 +105,48 @@ class OCRProcessor:
 
         return encoded_images
 
+    async def save_document(self, file_name: str) -> None:
+        """Save document metadata to database."""
+        try:
+            await self.repository.create(
+                DocumentCreate(
+                    file_name=file_name,
+                    file_path=str(config.UPLOAD_DIR / file_name),
+                )
+            )
+        except DocumentError as e:
+            logger.error("Failed to save document: %s", str(e))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to save document",
+            ) from e
+
+
+@app.get("/documents")
+async def get_docs(
+    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
+) -> list[dict]:
+    """Get all documents."""
+    try:
+        documents = await repository.get_all()
+        return [doc.to_dict() for doc in documents]
+    except DocumentError as e:
+        logger.error("Failed to retrieve documents: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve documents",
+        ) from e
+
 
 @app.post("/ocr")
-async def process_document(file: UploadFile) -> dict[str, str]:
+async def process_document(
+    file: UploadFile,
+    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
+) -> dict[str, str]:
     """Process document for OCR and forward results."""
     logger.info("Processing document: %s", file.filename)
 
-    processor = OCRProcessor()
+    processor = OCRProcessor(repository)
 
     try:
         processor.validate_file(file)
@@ -116,6 +157,8 @@ async def process_document(file: UploadFile) -> dict[str, str]:
 
         logger.debug("Processed images: %d", len(preprocessed_images))
 
+        await processor.save_document(file.filename)
+
         response = requests.post(
             config.PROCESSOR_URL,
             json={
@@ -123,6 +166,7 @@ async def process_document(file: UploadFile) -> dict[str, str]:
                     "results"
                 ],
                 "images": encoded_images,
+                "file_name": file.filename,
             },
             timeout=30,
         )

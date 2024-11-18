@@ -40,6 +40,7 @@ class ProcessorInput(BaseModel):
 
     ocr_result: list[list[OCRResult]]
     images: list[str] = Field(..., description="Base64 encoded images")
+    file_name: str = Field(..., description="Name of the processed file")
 
     model_config = ConfigDict(
         json_schema_extra={

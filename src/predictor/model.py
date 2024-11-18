@@ -1,15 +1,16 @@
 import logging
 from datetime import datetime
-from typing import Any
+from typing import Any, AsyncGenerator
 
 import lightning.pytorch as pl
 import torch
 import torch.nn.functional as F
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from torchmetrics import Accuracy
 from transformers import LayoutLMv3ForSequenceClassification, PreTrainedModel
 
 from configs.model_config import ModelConfig
+from database import DocumentError, DocumentRepository, get_repository
 from payload.model_models import PagePrediction, ProcessorResult
 
 config = ModelConfig()
@@ -184,13 +185,18 @@ def aggregate_predictions(
 
 
 @app.post("/predict-class")
-async def predict(data: ProcessorResult) -> dict[str, str]:
+async def predict(
+    data: ProcessorResult,
+    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
+) -> dict[str, str]:
     """
     Predict document class from processed data.
 
     Args:
         data: Processed data from document processor
+        repository: Document repository instance
     """
+
     try:
         logger.info("Received data for prediction")
         input_ids = torch.tensor(data.input_ids)
@@ -225,8 +231,23 @@ async def predict(data: ProcessorResult) -> dict[str, str]:
         logger.debug("Prediction results: %s", detailed_results)
         logger.info("Predicted class: %s", detailed_results["predicted_class"])
 
+        try:
+            await repository.update_classification(
+                data.file_name,
+                detailed_results["predicted_class"],
+            )
+        except DocumentError as e:
+            logger.error("Failed to update classification: %s", str(e))
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to update classification",
+            ) from e
+
         return {"predicted_classes": detailed_results["predicted_class"]}
 
     except Exception as e:
         logger.exception("Prediction failed")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        ) from e

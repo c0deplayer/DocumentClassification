@@ -94,7 +94,13 @@ async def process_text(data: ProcessorInput) -> dict[str, str]:
 
         response = requests.post(
             config.PREDICT_URL,
-            json=encodings,
+            json={
+                "input_ids": encodings["input_ids"],
+                "attention_mask": encodings["attention_mask"],
+                "bbox": encodings["bbox"],
+                "pixel_values": encodings["pixel_values"],
+                "file_name": data.file_name,
+            },
             timeout=30,
         )
         return response.json()

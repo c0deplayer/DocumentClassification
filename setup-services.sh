@@ -24,6 +24,12 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+# Check if any docker containers exist and stop them
+if [ "$(docker ps -q)" ]; then
+    echo "Stopping existing containers..."
+    docker-compose down --volumes
+fi
+
 # Create models and logs directories if they don't exist
 mkdir -p models
 mkdir -p logs
@@ -51,4 +57,4 @@ fi
 cd ..
 
 # Start Docker services
-docker-compose up --build --abort-on-container-failure
+docker-compose up --build --detach
