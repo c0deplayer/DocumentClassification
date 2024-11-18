@@ -3,11 +3,11 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - '**.py'
+      - "**.py"
     branches:
       - main
   schedule:
-    - cron: '30 16 * * *'
+    - cron: "30 16 * * *"
 
 jobs:
   push_to_docker_hub:
@@ -34,7 +34,7 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -63,5 +63,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           file: ${{ matrix.dockerfile }}
           push: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
