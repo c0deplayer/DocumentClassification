@@ -2,7 +2,7 @@
 
 [![en](https://img.shields.io/badge/lang-en-green.svg)](./README.en.md)
 [![pdm-managed](https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fpdm-project%2F.github%2Fbadge.json)](https://pdm-project.org)
-![build-and-push-docker-images](https://github.com/c0deplayer/DocumentClassification/actions/workflows/docker-build.yml/badge.svg)
+[![Build and Push Docker Images](https://github.com/c0deplayer/DocumentClassification/actions/workflows/docker-build.yml/badge.svg?branch=main)](https://github.com/c0deplayer/DocumentClassification/actions/workflows/docker-build.yml)
 
 ## Cel projektu
 
