@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - "**.py"
+      - "**.Dockerfile"
+      - "**.template"
+      - "**.yml"
     branches:
       - main
   schedule:
