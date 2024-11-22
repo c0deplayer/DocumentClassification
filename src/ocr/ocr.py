@@ -96,6 +96,9 @@ class OCRProcessor:
         encoded_images = []
 
         for img in images:
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+
             with io.BytesIO() as buffer:
                 img.save(buffer, format="JPEG")
                 img_byte_arr = buffer.getvalue()
