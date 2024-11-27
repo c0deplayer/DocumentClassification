@@ -18,7 +18,7 @@ jobs:
       with:
         python-version: '3.12'
     
-    - uses: astral-sh/ruff-action@v1
+    - uses: astral-sh/ruff-action@v2
       with:
         changed-files: "true"
         
