@@ -15,7 +15,7 @@ Projekt koncentruje się na implementacji zaawansowanego systemu klasyfikacji do
 ### Podstawowe komponenty
 - **Framework ML**: [PyTorch 2.5.0](https://pytorch.org/)
 - **Model bazowy**: [LayoutLMv3](https://huggingface.co/microsoft/layoutlmv3-base)
-- **OCR Engine**: [EasyOCR](https://github.com/JaidedAI/EasyOCR)
+- **OCR Engine**: [EasyOCR](https://github.com/JaidedAI/EasyOCR) oraz [Tesseract](https://github.com/tesseract-ocr/tesseract)
 - **API Framework**: [FastAPI](https://fastapi.tiangolo.com/)
 - **Konteneryzacja**: [Docker](https://www.docker.com/) z obrazami wieloarchitekturowymi (amd64/arm64)
 
