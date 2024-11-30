@@ -13,7 +13,7 @@ Harmonogram realizacji projektu
 
 6 XII 2024 - Optymalizacja
 - Analiza różnych metod uczenia maszynowego
-- Testy wydajności i dokładności
+- Implementacja generowania podsumowań
 - Wybór optymalnego rozwiązania
 
 20 XII 2024 - Rozszerzenia

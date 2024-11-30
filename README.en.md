@@ -127,14 +127,4 @@ pip install -r requirements.txt
     - Document classification: max 10 seconds
     - OCR: max 10 seconds per page
 
----
-
-## Project Timeline
-
-| Date        | Stage                     | Key Tasks                                                                                                            |
-|-------------|---------------------------|----------------------------------------------------------------------------------------------------------------------|
-| 8 Nov 2024  | Initial Environment Setup | • Cloud and local environment setup<br>• Repository creation<br>• Data preparation pipeline setup<br>• OCR           |
-| 22 Nov 2024 | Baseline Model & Database | • Implementation of basic machine learning method<br>• Database configuration                                        |
-| 6 Dec 2024  | Model Optimization        | • Analysis of various machine learning methods<br>• Performance and accuracy testing<br>• Optimal solution selection |
-| 20 Dec 2024 | Feature Expansion         | • Implementation of multilingual support<br>• Description generation system                                          |
-| 17 Jan 2025 | User Interface            | • Web interface implementation<br>• Final documentation                                                              |
+---                                                           |
