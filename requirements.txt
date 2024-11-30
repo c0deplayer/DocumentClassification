@@ -10,6 +10,7 @@ numpy>=2.1.2
 pdf2image>=1.17.0
 pillow>=11.0.0
 psycopg2-binary>=2.9.10
+pytesseract>=0.3.13
 python-dotenv>=1.0.1
 python-multipart>=0.0.16
 rich>=13.9.3

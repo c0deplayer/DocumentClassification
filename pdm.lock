@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = []
 lock_version = "4.5.0"
-content_hash = "sha256:5dfa970462860db989b3cf22289b3fd51b56f63d7474794537f4e791a1ab7561"
+content_hash = "sha256:e9287b61a1cd1e1987c28d7ca845e7a291b0678b7b17e6919e8bdd9bd86197bb"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.13"
@@ -982,6 +982,19 @@ files = [
 ]
 
 [[package]]
+name = "pytesseract"
+version = "0.3.13"
+summary = ""
+dependencies = [
+    "packaging",
+    "pillow",
+]
+files = [
+    {file = "pytesseract-0.3.13-py3-none-any.whl", hash = "sha256:7a99c6c2ac598360693d83a416e36e0b33a67638bb9d77fdcac094a3589d4b34"},
+    {file = "pytesseract-0.3.13.tar.gz", hash = "sha256:4bf5f880c99406f52a3cfc2633e42d9dc67615e69d8a509d74867d3baddb5db9"},
+]
+
+[[package]]
 name = "python-bidi"
 version = "0.6.3"
 summary = ""
@@ -1026,11 +1039,11 @@ files = [
 
 [[package]]
 name = "python-multipart"
-version = "0.0.17"
+version = "0.0.18"
 summary = ""
 files = [
-    {file = "python_multipart-0.0.17-py3-none-any.whl", hash = "sha256:15dc4f487e0a9476cc1201261188ee0940165cffc94429b6fc565c4d3045cb5d"},
-    {file = "python_multipart-0.0.17.tar.gz", hash = "sha256:41330d831cae6e2f22902704ead2826ea038d0419530eadff3ea80175aec5538"},
+    {file = "python_multipart-0.0.18-py3-none-any.whl", hash = "sha256:efe91480f485f6a361427a541db4796f9e1591afc0fb8e7a4ba06bfbc6708996"},
+    {file = "python_multipart-0.0.18.tar.gz", hash = "sha256:7a68db60c8bfb82e460637fa4750727b45af1d5e2ed215593f917f64694d34fe"},
 ]
 
 [[package]]
@@ -1438,7 +1451,7 @@ files = [
 
 [[package]]
 name = "transformers"
-version = "4.46.2"
+version = "4.46.3"
 summary = ""
 dependencies = [
     "filelock",
@@ -1453,8 +1466,8 @@ dependencies = [
     "tqdm",
 ]
 files = [
-    {file = "transformers-4.46.2-py3-none-any.whl", hash = "sha256:c921f4406b78e6518c97b618c5acd1cf8a4f2315b6b727f4bf9e01496eef849c"},
-    {file = "transformers-4.46.2.tar.gz", hash = "sha256:3d85410881e1c074be767877bf33c83231ec11529f274a6044ecb20c157ba14e"},
+    {file = "transformers-4.46.3-py3-none-any.whl", hash = "sha256:a12ef6f52841fd190a3e5602145b542d03507222f2c64ebb7ee92e8788093aef"},
+    {file = "transformers-4.46.3.tar.gz", hash = "sha256:8ee4b3ae943fe33e82afff8e837f4b052058b07ca9be3cb5b729ed31295f72cc"},
 ]
 
 [[package]]
