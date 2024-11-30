@@ -115,7 +115,7 @@ class Summarizer:
                     "classification": classification,
                 }
             )
-            return response.content.strip().rstrip(".").replace(" \n", ". ")
+            return response.content.strip().replace(" \n", ". ")
         except Exception as e:
             logger.error("Summarization failed: %s", str(e))
             raise HTTPException(

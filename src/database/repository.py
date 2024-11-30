@@ -54,14 +54,19 @@ class DocumentRepository:
             raise DocumentNotFoundError(f"Document with ID {document_id} not found")
         return document
 
-    async def get_by_filename(self, file_name: str) -> Document:
+    async def get_by_filename(
+        self, file_name: str, *, return_bool: bool = False
+    ) -> Document | bool:
         """Retrieve document by filename."""
         query = select(Document).filter(Document.file_name == file_name)
         result = await self.session.execute(query)
         document = result.scalar_one_or_none()
 
         if not document:
+            if return_bool:
+                return False
             raise DocumentNotFoundError(f"Document {file_name} not found")
+
         return document
 
     async def get_all(self) -> Sequence[Document]:

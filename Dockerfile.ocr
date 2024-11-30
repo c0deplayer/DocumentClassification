@@ -31,6 +31,7 @@ COPY src/configs/ocr_config.py /app/code/configs/
 COPY src/configs/database_config.py /app/code/configs/
 COPY src/payload/ocr_models.py /app/code/payload/
 COPY src/database/ /app/code/database/
+COPY src/utils/ /app/code/utils/
 COPY .env /app/code/
 
 WORKDIR /app/code/
