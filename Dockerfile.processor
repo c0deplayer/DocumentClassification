@@ -1,34 +1,33 @@
-FROM ghcr.io/astral-sh/uv:latest AS uv
-FROM python:3.12-slim AS python
-
-LABEL authors="codeplayer"
+FROM ghcr.io/astral-sh/uv:latest AS builder
+FROM python:3.12-slim-bullseye AS final
 
 ENV VIRTUAL_ENV=/opt/venv
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
-# RUN mkdir -p /app/data/logs/processor
+WORKDIR /app
 
-# Update and upgrade the system
-RUN apt update -y && \
-  apt upgrade -y \
-  # cleanup
-  && apt autoremove -y \
-  && apt clean -y \
-  && rm -rf /var/lib/apt/lists
+# Install minimal required dependencies
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+  git \
+  && rm -rf /var/lib/apt/lists/*
 
-RUN  \
-  # we use a cache --mount to reuse the uv cache across builds
-  --mount=type=cache,target=/root/.cache/uv \
-  # we use a bind --mount to use the uv binary from the uv stage
-  --mount=type=bind,from=uv,source=/uv,target=/uv \
-  # we use a bind --mount to use the requirements.txt from the host instead of adding a COPY layer
-  --mount=type=bind,source=requirements.txt,target=requirements.txt \
-  /uv venv /opt/venv && \
-  /uv pip install -r requirements.txt
+# Create and activate virtual environment
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-WORKDIR /app/code/processor
+# Install dependencies using uv
+COPY --from=builder /uv /uv
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/uv \
+  /uv pip install --no-cache-dir -r requirements.txt
 
-COPY src/processor/ .
-COPY src/configs/processor_config.py configs/processor_config.py
-COPY src/payload/processor_models.py payload/processor_models.py
+# Copy only necessary files
+COPY src/processor/ /app/code/
+COPY src/configs/processor_config.py /app/code/configs/
+COPY src/payload/processor_models.py /app/code/payload/
 
-CMD ["/opt/venv/bin/python", "-m", "uvicorn", "processor:app", "--host", "0.0.0.0", "--port", "9090"]
+WORKDIR /app/code/
+
+CMD ["python", "-m", "uvicorn", "processor:app", "--host", "0.0.0.0", "--port", "9090"]

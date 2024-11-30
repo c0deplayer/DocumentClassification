@@ -1,35 +1,36 @@
-FROM ghcr.io/astral-sh/uv:latest AS uv
-FROM python:3.12-slim AS python
+FROM ghcr.io/astral-sh/uv:latest AS builder
+FROM python:3.12-slim-bullseye AS final
 
 ENV VIRTUAL_ENV=/opt/venv
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
-WORKDIR /app/data/predictor
+WORKDIR /app
 
-# Update and upgrade the system
-RUN apt update -y && \
-  apt upgrade -y \
-  # cleanup
-  && apt autoremove -y \
-  && apt clean -y \
-  && rm -rf /var/lib/apt/lists
+# Install minimal required dependencies
+RUN apt-get update && \
+  apt-get install -y --no-install-recommends \
+  git \
+  && rm -rf /var/lib/apt/lists/*
 
-RUN  \
-  # we use a cache --mount to reuse the uv cache across builds
-  --mount=type=cache,target=/root/.cache/uv \
-  # we use a bind --mount to use the uv binary from the uv stage
-  --mount=type=bind,from=uv,source=/uv,target=/uv \
-  # we use a bind --mount to use the requirements.txt from the host instead of adding a COPY layer
-  --mount=type=bind,source=requirements.txt,target=requirements.txt \
-  /uv venv /opt/venv && \
-  /uv pip install -r requirements.txt
+# Create and activate virtual environment
+RUN python -m venv $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-WORKDIR /app/code/predictor
+# Install dependencies using uv
+COPY --from=builder /uv /uv
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/uv \
+  /uv pip install --no-cache-dir -r requirements.txt
 
-COPY src/predictor/ .
-COPY src/configs/model_config.py configs/model_config.py
-COPY src/configs/database_config.py configs/database_config.py
-COPY src/payload/model_models.py payload/model_models.py
-COPY src/database/ database/
-COPY .env .
+# Copy only necessary files
+COPY src/predictor/ /app/code/
+COPY src/configs/model_config.py /app/code/configs/
+COPY src/configs/database_config.py /app/code/configs/
+COPY src/payload/model_models.py /app/code/payload/
+COPY src/database/ /app/code/database/
+COPY .env /app/code/
 
-CMD ["/opt/venv/bin/python","-m", "uvicorn", "model:app", "--host", "0.0.0.0", "--port", "7070"]
+WORKDIR /app/code/
+
+CMD ["python", "-m", "uvicorn", "model:app", "--host", "0.0.0.0", "--port", "7070"]
