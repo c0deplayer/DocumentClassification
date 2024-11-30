@@ -58,7 +58,7 @@ class OptimizedOCR:
         """Initialize EasyOCR with optimized settings."""
         return easyocr.Reader(
             ["en", "pl"],
-            gpu=False,
+            gpu=True,
             model_storage_directory="/app/data/models",
             download_enabled=True,
             quantize=True,

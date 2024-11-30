@@ -153,8 +153,11 @@ class DocumentClassificationDataset(Dataset):
     def _calculate_scales(self, image_size: tuple[int, int]) -> tuple[float, float]:
         """Calculate scaling factors for image resizing."""
         width, height = image_size
+        logger.debug("Image size: %s", image_size)
         width_scale = self.config.IMAGE_TARGET_SIZE / width
         height_scale = self.config.IMAGE_TARGET_SIZE / height
+        logger.debug("Scaling factors: %s", (width_scale, height_scale))
+
         return width_scale, height_scale
 
     @staticmethod

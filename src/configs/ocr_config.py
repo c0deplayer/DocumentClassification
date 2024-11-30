@@ -11,7 +11,7 @@ class OCRConfig:
 
     FILE_SIZE_LIMIT: int = 20 * BYTE_MEGABYTE
     MAX_PDF_PAGES: int = 15
-    TARGET_SIZE: int = 1028
+    TARGET_SIZE: int = 1240
     MAX_WORKERS: int = 4
     LOG_DIR: Path = Path("/app/data/logs/ocr")
     ACCEPTED_FILE_TYPES: Set[str] = frozenset(

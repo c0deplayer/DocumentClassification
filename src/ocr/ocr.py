@@ -6,10 +6,10 @@ from typing import AsyncGenerator
 
 import requests
 from fastapi import Depends, FastAPI, HTTPException, UploadFile, status
-from optimized_ocr import OptimizedOCR
 from pdf2image import convert_from_bytes
 from pdf2image.exceptions import PDFPageCountError
 from PIL import Image
+from tesseract import TesseractOCR
 
 from configs.ocr_config import OCRConfig
 from database import DocumentCreate, DocumentError, DocumentRepository, get_repository
@@ -33,7 +33,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-optimizer = OptimizedOCR(config=config)
+# optimizer = OptimizedOCR(config=config)
+optimizer = TesseractOCR(config=config)
 
 
 class OCRProcessor:
