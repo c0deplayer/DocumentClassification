@@ -107,6 +107,22 @@ class DocumentRepository:
                 f"Failed to update classification for {file_name}", original_error=e
             )
 
+    async def update_summary(self, file_name: str, summary: str) -> Document:
+        """Update document summary."""
+        try:
+            document = await self.get_by_filename(file_name)
+            document.summary = summary
+
+            await self.session.commit()
+            await self.session.refresh(document)
+
+            return document
+
+        except SQLAlchemyError as e:
+            raise DocumentUpdateError(
+                f"Failed to update summary for {file_name}", original_error=e
+            )
+
     async def delete(self, document_id: int) -> None:
         """Delete document by ID."""
         try:

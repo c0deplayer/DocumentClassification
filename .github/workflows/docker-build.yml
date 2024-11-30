@@ -24,6 +24,8 @@ jobs:
             dockerfile: ./Dockerfile.processor
           - image: c0deplayer/dc-predictor
             dockerfile: ./Dockerfile.predictor
+          - image: c0deplayer/dc-summarizer
+            dockerfile: ./Dockerfile.summarizer
 
     steps:
       - name: Checkout

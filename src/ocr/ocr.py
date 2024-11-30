@@ -172,7 +172,7 @@ async def process_document(
                 "images": encoded_images,
                 "file_name": file.filename,
             },
-            timeout=30,
+            timeout=300,
         )
 
         logger.info("Document processing completed: %s", file.filename)

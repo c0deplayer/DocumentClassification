@@ -28,3 +28,5 @@ class ModelConfig:
             "memo",
         ]
     )
+
+    SUMMARIZER_URL: str = "http://summarizer:6060/summarize"

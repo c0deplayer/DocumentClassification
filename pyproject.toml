@@ -24,6 +24,9 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30.0",
     "pytesseract>=0.3.13",
+    "langchain>=0.3.9",
+    "langchain-ollama>=0.2.0",
+    "psutil>=6.1.0",
 ]
 requires-python = ">=3.12,<3.13"
 readme = "README.md"

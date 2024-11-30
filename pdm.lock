@@ -5,7 +5,7 @@
 groups = ["default"]
 strategy = []
 lock_version = "4.5.0"
-content_hash = "sha256:e9287b61a1cd1e1987c28d7ca845e7a291b0678b7b17e6919e8bdd9bd86197bb"
+content_hash = "sha256:b15d53ea77b8f40fcf5f49e6ec7b7ebe0e81cd7f80fa0d2239e093a6d4ef9c0f"
 
 [[metadata.targets]]
 requires_python = ">=3.12,<3.13"
@@ -481,6 +481,107 @@ files = [
 ]
 
 [[package]]
+name = "jsonpatch"
+version = "1.33"
+summary = ""
+dependencies = [
+    "jsonpointer",
+]
+files = [
+    {file = "jsonpatch-1.33-py2.py3-none-any.whl", hash = "sha256:0ae28c0cd062bbd8b8ecc26d7d164fbbea9652a1a3693f3b956c1eae5145dade"},
+    {file = "jsonpatch-1.33.tar.gz", hash = "sha256:9fcd4009c41e6d12348b4a0ff2563ba56a2923a7dfee731d004e212e1ee5030c"},
+]
+
+[[package]]
+name = "jsonpointer"
+version = "3.0.0"
+summary = ""
+files = [
+    {file = "jsonpointer-3.0.0-py2.py3-none-any.whl", hash = "sha256:13e088adc14fca8b6aa8177c044e12701e6ad4b28ff10e65f2267a90109c9942"},
+    {file = "jsonpointer-3.0.0.tar.gz", hash = "sha256:2b2d729f2091522d61c3b31f82e11870f60b68f43fbc705cb76bf4b832af59ef"},
+]
+
+[[package]]
+name = "langchain"
+version = "0.3.9"
+summary = ""
+dependencies = [
+    "aiohttp",
+    "langchain-core",
+    "langchain-text-splitters",
+    "langsmith",
+    "numpy",
+    "pydantic",
+    "pyyaml",
+    "requests",
+    "sqlalchemy",
+    "tenacity",
+]
+files = [
+    {file = "langchain-0.3.9-py3-none-any.whl", hash = "sha256:ade5a1fee2f94f2e976a6c387f97d62cc7f0b9f26cfe0132a41d2bda761e1045"},
+    {file = "langchain-0.3.9.tar.gz", hash = "sha256:4950c4ad627d0aa95ce6bda7de453e22059b7e7836b562a8f781fb0b05d7294c"},
+]
+
+[[package]]
+name = "langchain-core"
+version = "0.3.21"
+summary = ""
+dependencies = [
+    "jsonpatch",
+    "langsmith",
+    "packaging",
+    "pydantic",
+    "pyyaml",
+    "tenacity",
+    "typing-extensions",
+]
+files = [
+    {file = "langchain_core-0.3.21-py3-none-any.whl", hash = "sha256:7e723dff80946a1198976c6876fea8326dc82566ef9bcb5f8d9188f738733665"},
+    {file = "langchain_core-0.3.21.tar.gz", hash = "sha256:561b52b258ffa50a9fb11d7a1940ebfd915654d1ec95b35e81dfd5ee84143411"},
+]
+
+[[package]]
+name = "langchain-ollama"
+version = "0.2.0"
+summary = ""
+dependencies = [
+    "langchain-core",
+    "ollama",
+]
+files = [
+    {file = "langchain_ollama-0.2.0-py3-none-any.whl", hash = "sha256:aa5b794599652494a07fd27b22784854480cd4c793f0db5e81ebeccc2affd135"},
+    {file = "langchain_ollama-0.2.0.tar.gz", hash = "sha256:250ad9f3edce1a0ca16e4fad19f783ac728d7d76888ba952c462cd9f680353f7"},
+]
+
+[[package]]
+name = "langchain-text-splitters"
+version = "0.3.2"
+summary = ""
+dependencies = [
+    "langchain-core",
+]
+files = [
+    {file = "langchain_text_splitters-0.3.2-py3-none-any.whl", hash = "sha256:0db28c53f41d1bc024cdb3b1646741f6d46d5371e90f31e7e7c9fbe75d01c726"},
+    {file = "langchain_text_splitters-0.3.2.tar.gz", hash = "sha256:81e6515d9901d6dd8e35fb31ccd4f30f76d44b771890c789dc835ef9f16204df"},
+]
+
+[[package]]
+name = "langsmith"
+version = "0.1.147"
+summary = ""
+dependencies = [
+    "httpx",
+    "orjson; platform_python_implementation != \"PyPy\"",
+    "pydantic",
+    "requests",
+    "requests-toolbelt",
+]
+files = [
+    {file = "langsmith-0.1.147-py3-none-any.whl", hash = "sha256:7166fc23b965ccf839d64945a78e9f1157757add228b086141eb03a60d699a15"},
+    {file = "langsmith-0.1.147.tar.gz", hash = "sha256:2e933220318a4e73034657103b3b1a3a6109cc5db3566a7e8e03be8d6d7def7a"},
+]
+
+[[package]]
 name = "lazy-loader"
 version = "0.4"
 summary = ""
@@ -784,6 +885,19 @@ files = [
 ]
 
 [[package]]
+name = "ollama"
+version = "0.4.2"
+summary = ""
+dependencies = [
+    "httpx",
+    "pydantic",
+]
+files = [
+    {file = "ollama-0.4.2-py3-none-any.whl", hash = "sha256:3059fe1fe34e24c782e9e8eebf69bcd2d7037007cb4b3cfda4b32bfee36ae2ef"},
+    {file = "ollama-0.4.2.tar.gz", hash = "sha256:5dffc826737a1d121c9ae371439cace20ab02ec4b0840fd55c56efa9a3fb3646"},
+]
+
+[[package]]
 name = "opencv-python-headless"
 version = "4.10.0.84"
 summary = ""
@@ -798,6 +912,27 @@ files = [
     {file = "opencv_python_headless-4.10.0.84-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:377d08a7e48a1405b5e84afcbe4798464ce7ee17081c1c23619c8b398ff18295"},
     {file = "opencv_python_headless-4.10.0.84-cp37-abi3-win32.whl", hash = "sha256:9092404b65458ed87ce932f613ffbb1106ed2c843577501e5768912360fc50ec"},
     {file = "opencv_python_headless-4.10.0.84-cp37-abi3-win_amd64.whl", hash = "sha256:afcf28bd1209dd58810d33defb622b325d3cbe49dcd7a43a902982c33e5fad05"},
+]
+
+[[package]]
+name = "orjson"
+version = "3.10.12"
+summary = ""
+files = [
+    {file = "orjson-3.10.12-cp312-cp312-macosx_10_15_x86_64.macosx_11_0_arm64.macosx_10_15_universal2.whl", hash = "sha256:53206d72eb656ca5ac7d3a7141e83c5bbd3ac30d5eccfe019409177a57634b0d"},
+    {file = "orjson-3.10.12-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:ac8010afc2150d417ebda810e8df08dd3f544e0dd2acab5370cfa6bcc0662f8f"},
+    {file = "orjson-3.10.12-cp312-cp312-manylinux_2_17_armv7l.manylinux2014_armv7l.whl", hash = "sha256:ed459b46012ae950dd2e17150e838ab08215421487371fa79d0eced8d1461d70"},
+    {file = "orjson-3.10.12-cp312-cp312-manylinux_2_17_ppc64le.manylinux2014_ppc64le.whl", hash = "sha256:8dcb9673f108a93c1b52bfc51b0af422c2d08d4fc710ce9c839faad25020bb69"},
+    {file = "orjson-3.10.12-cp312-cp312-manylinux_2_17_s390x.manylinux2014_s390x.whl", hash = "sha256:22a51ae77680c5c4652ebc63a83d5255ac7d65582891d9424b566fb3b5375ee9"},
+    {file = "orjson-3.10.12-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:910fdf2ac0637b9a77d1aad65f803bac414f0b06f720073438a7bd8906298192"},
+    {file = "orjson-3.10.12-cp312-cp312-manylinux_2_5_i686.manylinux1_i686.whl", hash = "sha256:24ce85f7100160936bc2116c09d1a8492639418633119a2224114f67f63a4559"},
+    {file = "orjson-3.10.12-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:8a76ba5fc8dd9c913640292df27bff80a685bed3a3c990d59aa6ce24c352f8fc"},
+    {file = "orjson-3.10.12-cp312-cp312-musllinux_1_2_armv7l.whl", hash = "sha256:ff70ef093895fd53f4055ca75f93f047e088d1430888ca1229393a7c0521100f"},
+    {file = "orjson-3.10.12-cp312-cp312-musllinux_1_2_i686.whl", hash = "sha256:f4244b7018b5753ecd10a6d324ec1f347da130c953a9c88432c7fbc8875d13be"},
+    {file = "orjson-3.10.12-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:16135ccca03445f37921fa4b585cff9a58aa8d81ebcb27622e69bfadd220b32c"},
+    {file = "orjson-3.10.12-cp312-none-win32.whl", hash = "sha256:2d879c81172d583e34153d524fcba5d4adafbab8349a7b9f16ae511c2cee8708"},
+    {file = "orjson-3.10.12-cp312-none-win_amd64.whl", hash = "sha256:fc23f691fa0f5c140576b8c365bc942d577d861a9ee1142e4db468e4e17094fb"},
+    {file = "orjson-3.10.12.tar.gz", hash = "sha256:0a78bbda3aea0f9f079057ee1ee8a1ecf790d4f1af88dd67493c6b8ee52506ff"},
 ]
 
 [[package]]
@@ -884,6 +1019,21 @@ files = [
     {file = "propcache-0.2.0-cp312-cp312-win_amd64.whl", hash = "sha256:ad9c9b99b05f163109466638bd30ada1722abb01bbb85c739c50b6dc11f92dc3"},
     {file = "propcache-0.2.0-py3-none-any.whl", hash = "sha256:2ccc28197af5313706511fab3a8b66dcd6da067a1331372c82ea1cb74285e036"},
     {file = "propcache-0.2.0.tar.gz", hash = "sha256:df81779732feb9d01e5d513fad0122efb3d53bbc75f61b2a4f29a020bc985e70"},
+]
+
+[[package]]
+name = "psutil"
+version = "6.1.0"
+summary = ""
+files = [
+    {file = "psutil-6.1.0-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:6e2dcd475ce8b80522e51d923d10c7871e45f20918e027ab682f94f1c6351688"},
+    {file = "psutil-6.1.0-cp36-abi3-macosx_11_0_arm64.whl", hash = "sha256:0895b8414afafc526712c498bd9de2b063deaac4021a3b3c34566283464aff8e"},
+    {file = "psutil-6.1.0-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:9dcbfce5d89f1d1f2546a2090f4fcf87c7f669d1d90aacb7d7582addece9fb38"},
+    {file = "psutil-6.1.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:498c6979f9c6637ebc3a73b3f87f9eb1ec24e1ce53a7c5173b8508981614a90b"},
+    {file = "psutil-6.1.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:d905186d647b16755a800e7263d43df08b790d709d575105d419f8b6ef65423a"},
+    {file = "psutil-6.1.0-cp37-abi3-win32.whl", hash = "sha256:1ad45a1f5d0b608253b11508f80940985d1d0c8f6111b5cb637533a0e6ddc13e"},
+    {file = "psutil-6.1.0-cp37-abi3-win_amd64.whl", hash = "sha256:a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be"},
+    {file = "psutil-6.1.0.tar.gz", hash = "sha256:353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a"},
 ]
 
 [[package]]
@@ -1130,6 +1280,18 @@ files = [
 ]
 
 [[package]]
+name = "requests-toolbelt"
+version = "1.0.0"
+summary = ""
+dependencies = [
+    "requests",
+]
+files = [
+    {file = "requests-toolbelt-1.0.0.tar.gz", hash = "sha256:7681a0a3d047012b5bdc0ee37d7f8f07ebe76ab08caeccfc3921ce23c88d5bc6"},
+    {file = "requests_toolbelt-1.0.0-py2.py3-none-any.whl", hash = "sha256:cccfdd665f0a24fcf4726e690f65639d272bb0637b9b92dfd91a5568ccf6bd06"},
+]
+
+[[package]]
 name = "rich"
 version = "13.9.4"
 summary = ""
@@ -1322,6 +1484,15 @@ dependencies = [
 files = [
     {file = "sympy-1.13.1-py3-none-any.whl", hash = "sha256:db36cdc64bf61b9b24578b6f7bab1ecdd2452cf008f34faa33776680c26d66f8"},
     {file = "sympy-1.13.1.tar.gz", hash = "sha256:9cebf7e04ff162015ce31c9c6c9144daa34a93bd082f54fd8f12deca4f47515f"},
+]
+
+[[package]]
+name = "tenacity"
+version = "9.0.0"
+summary = ""
+files = [
+    {file = "tenacity-9.0.0-py3-none-any.whl", hash = "sha256:93de0c98785b27fcf659856aa9f54bfbd399e29969b0621bc7f762bd441b4539"},
+    {file = "tenacity-9.0.0.tar.gz", hash = "sha256:807f37ca97d62aa361264d497b0e31e92b8027044942bfa756160d908320d73b"},
 ]
 
 [[package]]

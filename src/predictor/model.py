@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Any, AsyncGenerator
 
 import lightning.pytorch as pl
+import requests
 import torch
 import torch.nn.functional as F
 from fastapi import Depends, FastAPI, HTTPException
@@ -243,7 +244,17 @@ async def predict(
                 detail="Failed to update classification",
             ) from e
 
-        return {"predicted_classes": detailed_results["predicted_class"]}
+        response = requests.post(
+            config.SUMMARIZER_URL,
+            json={
+                "file_name": data.file_name,
+                "text": data.text,
+                "classification": detailed_results["predicted_class"],
+            },
+            timeout=300,
+        )
+
+        return response.json()
 
     except Exception as e:
         logger.exception("Prediction failed")

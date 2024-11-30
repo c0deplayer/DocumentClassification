@@ -23,6 +23,7 @@ class ProcessorResult(BaseModel):
     bbox: list
     pixel_values: list
     file_name: str
+    text: str
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,

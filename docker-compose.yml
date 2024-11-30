@@ -50,7 +50,6 @@ services:
         source: models
         target: /app/data/models
 
-
   processor:
     container_name: processor_service
     # image: c0deplayer/dc-processor:main
@@ -94,8 +93,56 @@ services:
         source: models
         target: /app/data/models
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama_service
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      - OLLAMA_ORIGINS=*
+      - OLLAMA_HOST=0.0.0.0
+    ports:
+      - "11434:11434"
+    volumes:
+      - type: volume
+        source: ollama_data
+        target: /root/.ollama
+      - type: bind
+        source: init-ollama.sh
+        target: /app/init-ollama.sh
+    healthcheck:
+      test: ollama ps || exit 1
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - document-classification
+    entrypoint: [ "/usr/bin/bash", "/app/init-ollama.sh" ]
+
+  summarizer:
+    container_name: summarizer_service
+    # image: c0deplayer/dc-summarizer:main
+    build:
+      dockerfile: Dockerfile.summarizer
+    environment:
+      TZ: Europe/Warsaw
+    ports:
+      - "6060:6060"
+    networks:
+      - document-classification
+    depends_on:
+      - ollama
+      - database
+      - predictor
+    volumes:
+      - type: bind
+        source: logs
+        target: /app/data/logs
+
 volumes:
   db:
+    driver: local
+  ollama_data:
     driver: local
 
 networks:

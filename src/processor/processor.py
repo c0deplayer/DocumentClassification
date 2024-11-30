@@ -92,6 +92,10 @@ async def process_text(data: ProcessorInput) -> dict[str, str]:
 
         encodings = {k: v.tolist() for k, v in encodings.model_dump().items()}
 
+        # logger.info(
+        #     "Text from OCR: %s", " ".join(result.word for result in data.ocr_result[0])
+        # )
+
         response = requests.post(
             config.PREDICT_URL,
             json={
@@ -100,8 +104,9 @@ async def process_text(data: ProcessorInput) -> dict[str, str]:
                 "bbox": encodings["bbox"],
                 "pixel_values": encodings["pixel_values"],
                 "file_name": data.file_name,
+                "text": " ".join(result.word for result in data.ocr_result[0]),
             },
-            timeout=30,
+            timeout=300,
         )
         return response.json()
 
