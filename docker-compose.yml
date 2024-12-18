@@ -49,6 +49,9 @@ services:
       - type: bind
         source: models
         target: /app/data/models
+      - type: volume
+        source: file_storage
+        target: /app/data/uploads
 
   processor:
     container_name: processor_service
@@ -116,7 +119,7 @@ services:
       interval: 120s
       timeout: 10s
       retries: 5
-      start_period: 30s
+      start_period: 20s
     networks:
       - document-classification
     entrypoint: ["/usr/bin/bash", "/app/init-ollama.sh"]
@@ -143,6 +146,8 @@ services:
 
 volumes:
   db:
+    driver: local
+  file_storage:
     driver: local
   ollama_data:
     driver: local
