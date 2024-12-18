@@ -1,7 +1,5 @@
 # Klasyfikacja Dokumentów
 
-[![en](https://img.shields.io/badge/lang-en-green.svg)](./README.en.md)
-[![pdm-managed](https://img.shields.io/endpoint?url=https%3A%2F%2Fcdn.jsdelivr.net%2Fgh%2Fpdm-project%2F.github%2Fbadge.json)](https://pdm-project.org)
 [![Build and Push Docker Images](https://github.com/c0deplayer/DocumentClassification/actions/workflows/docker-build.yml/badge.svg?branch=main)](https://github.com/c0deplayer/DocumentClassification/actions/workflows/docker-build.yml)
 
 ## Cel projektu
@@ -15,12 +13,13 @@ Projekt koncentruje się na implementacji zaawansowanego systemu klasyfikacji do
 ### Podstawowe komponenty
 - **Framework ML**: [PyTorch 2.5.0](https://pytorch.org/)
 - **Model bazowy**: [LayoutLMv3](https://huggingface.co/microsoft/layoutlmv3-base)
+- **Summarization**: [LLama 3.2 3B](https://ollama.com/library/llama3.2)
 - **OCR Engine**: [EasyOCR](https://github.com/JaidedAI/EasyOCR) oraz [Tesseract](https://github.com/tesseract-ocr/tesseract)
 - **API Framework**: [FastAPI](https://fastapi.tiangolo.com/)
 - **Konteneryzacja**: [Docker](https://www.docker.com/) z obrazami wieloarchitekturowymi (amd64/arm64)
 
 ### Narzędzia pomocnicze
-- **Zarządzanie zależnościami**: [PDM](https://pdm-project.org/en/latest/)
+- **Zarządzanie zależnościami**: [uv](https://docs.astral.sh/uv/)
 - **Formatowanie kodu:** [Ruff](https://docs.astral.sh/ruff/)
 - **CI/CD:** [GitHub Actions](https://docs.github.com/en/actions)
 - **Przetwarzanie obrazów**: [Pillow](https://python-pillow.org/), [pdf2image](https://pdf2image.readthedocs.io/en/latest/index.html)
@@ -37,10 +36,10 @@ zależności, należy uruchomić poniższą komendę:
 pip install -r requirements.txt
 ```
 
-lub przy użyciu `pdm`:
+lub przy użyciu `uv`:
 
 ```bash
-pdm install
+uv sync --frozen
 ```
 ---
 
