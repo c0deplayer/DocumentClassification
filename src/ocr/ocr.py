@@ -3,12 +3,14 @@ from __future__ import annotations
 import base64
 import io
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import aiofiles
 import aiohttp
+from dotenv import load_dotenv
 from fastapi import (
     Depends,
     FastAPI,
@@ -28,6 +30,7 @@ from database import (
     DocumentRepository,
     get_repository,
 )
+from encryption.aes import AESCipher
 from utils.utils import get_unique_filename
 
 if TYPE_CHECKING:
@@ -46,7 +49,7 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.FileHandler(
-            config.LOG_DIR / f"{datetime.now(tz=datetime.UTC):%Y-%m-%d}.log",
+            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
             mode="a",
         ),
         logging.StreamHandler(),
@@ -56,11 +59,55 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-# optimizer = EasyOCRWrapper(config=config)
 optimizer = TesseractWrapper(config=config)
+
+load_dotenv()
+ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+if not ENCRYPTION_KEY:
+    err_msg = "Missing ENCRYPTION_KEY"
+    raise ValueError(err_msg)
+
+KEY = base64.b64decode(ENCRYPTION_KEY)
+
+
+cipher = AESCipher(KEY)
 
 
 class OCRProcessor:
+    """OCR Processing Handler.
+
+    This class manages OCR (Optical Character Recognition) processing operations including
+    file validation, image conversion, and document storage.
+
+    Attributes:
+        repository (DocumentRepository): Repository for document storage and retrieval.
+
+    Methods:
+        validate_file(file: UploadFile) -> str:
+            Validates uploaded file against size, type and other constraints.
+            Returns a unique filename for the document.
+
+        convert_file_to_images(file: UploadFile) -> list[Image.Image]:
+            Converts uploaded file (PDF or image) to a list of PIL Image objects.
+
+        convert_to_base64(images: list[Image.Image]) -> list[str]:
+            Converts PIL Image objects to base64 encoded strings.
+
+        save_document(file_name: str) -> Document:
+            Saves document metadata to the database.
+
+    Raises:
+        HTTPException: For various validation failures including:
+            - Missing filename (400)
+            - Unsupported file type (415)
+            - Empty file (400)
+            - File too large (413)
+            - PDF page limit exceeded (400)
+            - Invalid PDF (400)
+            - Database storage failures (500)
+
+    """
+
     """Handle OCR processing operations."""
 
     def __init__(self, document_repository: DocumentRepository) -> None:
@@ -190,7 +237,7 @@ async def get_docs(
         documents = await repository.get_all()
         return [doc.to_dict() for doc in documents]
     except DocumentError as e:
-        logger.exception("Failed to retrieve documents: %s", str(e))
+        logger.exception("Failed to retrieve documents")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve documents",
@@ -223,6 +270,28 @@ async def process_document(
         async with aiofiles.open(output_file, "wb") as out_file:
             while content := await file.read(1024):  # async read chunk
                 await out_file.write(content)  # async write chunk
+
+        # Initialize encryption for this file
+        temp_encrypted_file = output_file.with_suffix(
+            output_file.suffix + ".encrypted",
+        )
+
+        # Encrypt the file
+        await cipher.encrypt_file(output_file, temp_encrypted_file)
+
+        # Replace original with encrypted version
+        if output_file.exists():
+            output_file.unlink()
+
+        Path(temp_encrypted_file).rename(output_file)
+
+        # For debugging purposes decrypt the file
+        # await cipher.decrypt_file(output_file, tmp_decrypted_file)
+
+        # if output_file.exists():
+        #     output_file.unlink()
+
+        # Path(tmp_decrypted_file).rename(output_file)
 
         file.file.seek(0)  # Reset file pointer
 
@@ -282,11 +351,11 @@ async def cleanup(
     if document_id:
         try:
             await repository.delete(document_id)
-        except DocumentError as e:
-            logger.exception("Failed to delete document: %s", str(e))
+        except DocumentError:
+            logger.exception("Failed to delete document")
 
     if output_file and output_file.exists():
         try:
             output_file.unlink()
-        except OSError as e:
-            logger.exception("Failed to delete file: %s", str(e))
+        except OSError:
+            logger.exception("Failed to delete file")
