@@ -20,20 +20,20 @@ from .schemas import (
 )
 
 __all__ = [
+    "Base",
+    "ConnectionError",
     "DatabaseConfig",
     "DatabaseConnection",
     "DatabaseError",
-    "ConnectionError",
-    "DocumentError",
-    "DocumentNotFoundError",
-    "DocumentSaveError",
-    "DocumentUpdateError",
-    "Base",
     "Document",
-    "DocumentRepository",
     "DocumentBase",
     "DocumentCreate",
-    "DocumentUpdate",
+    "DocumentError",
+    "DocumentNotFoundError",
+    "DocumentRepository",
     "DocumentResponse",
+    "DocumentSaveError",
+    "DocumentUpdate",
+    "DocumentUpdateError",
     "get_repository",
 ]

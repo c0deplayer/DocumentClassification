@@ -1,13 +1,16 @@
-import os
 import re
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
+from pathlib import Path
+from typing import NoReturn
 
 from database.repository import DocumentRepository
 
 
-def make_unique_filename(original_filename: str, existing_filenames: set[str]) -> str:
-    """
-    Generate a unique filename by appending a number if the filename already exists.
+def make_unique_filename(
+    original_filename: str,
+    existing_filenames: set[str],
+) -> str:
+    """Generate a unique filename by appending a number if the filename already exists.
 
     Args:
         original_filename: The original filename to make unique
@@ -23,12 +26,14 @@ def make_unique_filename(original_filename: str, existing_filenames: set[str]) -
         'test (2).pdf'
         >>> make_unique_filename("my file.pdf", {"my file.pdf"})
         'my file (1).pdf'
+
     """
     if original_filename not in existing_filenames:
         return original_filename
 
-    # Split the filename into name and extension
-    name, ext = os.path.splitext(original_filename)
+    path = Path(original_filename)
+    name = path.stem
+    ext = path.suffix
 
     # Check if filename already ends with a number in parentheses
     pattern = r"(.*?)\s*(?:\((\d+)\))?$"
@@ -52,8 +57,7 @@ async def get_unique_filename(
     repository: AsyncGenerator[DocumentRepository, None],
     max_attempts: int = 100,
 ) -> str:
-    """
-    Generate a unique filename that doesn't exist in the database.
+    """Generate a unique filename that doesn't exist in the database.
 
     Args:
         filename: Original filename to make unique
@@ -65,7 +69,13 @@ async def get_unique_filename(
 
     Raises:
         ValueError: If unable to generate unique filename within max_attempts
+
     """
+    # Create error message once
+    error_message = (
+        "Unable to generate unique filename for {} within {} attempts"
+    )
+
     try:
         # Get all existing filenames from database
         documents = await repository.get_all()
@@ -77,12 +87,16 @@ async def get_unique_filename(
         # Verify we didn't exceed max attempts (check the number in parentheses)
         match = re.search(r"\((\d+)\)", unique_name)
         if match and int(match.group(1)) > max_attempts:
-            raise ValueError(
-                f"Unable to generate unique filename for {filename} "
-                f"within {max_attempts} attempts"
-            )
+            # Abstract raise to inner function
+            def raise_max_attempts() -> NoReturn:
+                raise ValueError(error_message.format(filename, max_attempts))
 
-        return unique_name
+            raise_max_attempts()
 
-    except Exception as e:
-        raise ValueError(f"Error generating unique filename: {str(e)}")
+        else:
+            return unique_name
+
+    except (StopAsyncIteration, AttributeError) as e:
+        # Distinguish exception source
+        error_msg = "Error generating unique filename: {}"
+        raise ValueError(error_msg.format(str(e))) from e

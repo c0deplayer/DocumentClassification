@@ -168,3 +168,6 @@ logs/
 __*.py
 !__init__.py
 models/
+
+.python-version
+__*.toml

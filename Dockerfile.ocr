@@ -1,39 +1,43 @@
-FROM ghcr.io/astral-sh/uv:latest AS builder
-FROM python:3.12-slim-bullseye AS final
+FROM python:3.12-slim-bullseye
 
-LABEL authors="codeplayer"
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-ENV VIRTUAL_ENV=/opt/venv
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
+ENV UV_PYTHON_DOWNLOADS=never
+# Location of the virtual environment
+ENV UV_PROJECT_ENVIRONMENT="/venv"
+# Location of the python installation via uv
+ENV UV_PYTHON_INSTALL_DIR="/python"
+# Byte compile the python files on installation
+ENV UV_COMPILE_BYTECODE=1
+# Python verision to use
+ENV UV_PYTHON=python3.12
+# Tweaking the PATH variable for easier use
+ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
 
 WORKDIR /app
 
 # Install only required runtime dependencies
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends \
-  poppler-utils tesseract-ocr libtesseract-dev \
-  && rm -rf /var/lib/apt/lists/*
-
-# Create and activate virtual environment
-RUN python -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+    apt-get install -y --no-install-recommends \
+    poppler-utils tesseract-ocr libtesseract-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies using uv
-COPY --from=builder /uv /uv
-COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/uv \
-  /uv pip install --no-cache-dir -r requirements.txt
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-editable
 
 # Copy only necessary files
 COPY src/ocr/ /app/code/
 COPY src/configs/ocr_config.py /app/code/configs/
 COPY src/configs/database_config.py /app/code/configs/
 COPY src/payload/ocr_models.py /app/code/payload/
+COPY src/payload/shared_models.py /app/code/payload/
 COPY src/database/ /app/code/database/
 COPY src/utils/ /app/code/utils/
 COPY .env /app/code/
 
 WORKDIR /app/code/
 
-CMD ["python", "-m", "uvicorn", "ocr:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uv", "run", "uvicorn", "ocr:app", "--host", "0.0.0.0", "--port", "8080"]

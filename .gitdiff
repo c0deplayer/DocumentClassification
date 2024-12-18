@@ -1,0 +1,3830 @@
+diff --git a/Dockerfile.ocr b/Dockerfile.ocr
+index 7efe618..a4130c0 100644
+--- a/Dockerfile.ocr
++++ b/Dockerfile.ocr
+@@ -1,39 +1,43 @@
+-FROM ghcr.io/astral-sh/uv:latest AS builder
+-FROM python:3.12-slim-bullseye AS final
+-
+-LABEL authors="codeplayer"
+-
+-ENV VIRTUAL_ENV=/opt/venv
+-ENV PYTHONUNBUFFERED=1
+-ENV PYTHONDONTWRITEBYTECODE=1
++FROM python:3.12-slim-bullseye
++
++COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
++
++ENV UV_PYTHON_DOWNLOADS=never
++# Location of the virtual environment
++ENV UV_PROJECT_ENVIRONMENT="/venv"
++# Location of the python installation via uv
++ENV UV_PYTHON_INSTALL_DIR="/python"
++# Byte compile the python files on installation
++ENV UV_COMPILE_BYTECODE=1
++# Python verision to use
++ENV UV_PYTHON=python3.12
++# Tweaking the PATH variable for easier use
++ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
+ 
+ WORKDIR /app
+ 
+ # Install only required runtime dependencies
+ RUN apt-get update && \
+-  apt-get install -y --no-install-recommends \
+-  poppler-utils tesseract-ocr libtesseract-dev \
+-  && rm -rf /var/lib/apt/lists/*
+-
+-# Create and activate virtual environment
+-RUN python -m venv $VIRTUAL_ENV
+-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
++    apt-get install -y --no-install-recommends \
++    poppler-utils tesseract-ocr libtesseract-dev \
++    && rm -rf /var/lib/apt/lists/*
+ 
+ # Install dependencies using uv
+-COPY --from=builder /uv /uv
+-COPY requirements.txt .
+ RUN --mount=type=cache,target=/root/.cache/uv \
+-  /uv pip install --no-cache-dir -r requirements.txt
++    --mount=type=bind,source=uv.lock,target=uv.lock \
++    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
++    uv sync --frozen --no-install-project --no-editable
+ 
+ # Copy only necessary files
+ COPY src/ocr/ /app/code/
+ COPY src/configs/ocr_config.py /app/code/configs/
+ COPY src/configs/database_config.py /app/code/configs/
+ COPY src/payload/ocr_models.py /app/code/payload/
++COPY src/payload/shared_models.py /app/code/payload/
+ COPY src/database/ /app/code/database/
+ COPY src/utils/ /app/code/utils/
+ COPY .env /app/code/
+ 
+ WORKDIR /app/code/
+ 
+-CMD ["python", "-m", "uvicorn", "ocr:app", "--host", "0.0.0.0", "--port", "8080"]
+\ No newline at end of file
++CMD ["uv", "run", "uvicorn", "ocr:app", "--host", "0.0.0.0", "--port", "8080"]
+diff --git a/Dockerfile.predictor b/Dockerfile.predictor
+index 3dd20d5..efcbb6c 100644
+--- a/Dockerfile.predictor
++++ b/Dockerfile.predictor
+@@ -1,36 +1,42 @@
+-FROM ghcr.io/astral-sh/uv:latest AS builder
+-FROM python:3.12-slim-bullseye AS final
+-
+-ENV VIRTUAL_ENV=/opt/venv
+-ENV PYTHONUNBUFFERED=1
+-ENV PYTHONDONTWRITEBYTECODE=1
++FROM python:3.12-slim-bullseye
++
++COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
++
++ENV UV_PYTHON_DOWNLOADS=never
++# Location of the virtual environment
++ENV UV_PROJECT_ENVIRONMENT="/venv"
++# Location of the python installation via uv
++ENV UV_PYTHON_INSTALL_DIR="/python"
++# Byte compile the python files on installation
++ENV UV_COMPILE_BYTECODE=1
++# Python verision to use
++ENV UV_PYTHON=python3.12
++# Tweaking the PATH variable for easier use
++ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
+ 
+ WORKDIR /app
+ 
+ # Install minimal required dependencies
+ RUN apt-get update && \
+-  apt-get install -y --no-install-recommends \
+-  git \
+-  && rm -rf /var/lib/apt/lists/*
+-
+-# Create and activate virtual environment
+-RUN python -m venv $VIRTUAL_ENV
+-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
++    apt-get install -y --no-install-recommends \
++    git \
++    && rm -rf /var/lib/apt/lists/*
+ 
+ # Install dependencies using uv
+-COPY --from=builder /uv /uv
+-COPY requirements.txt .
+ RUN --mount=type=cache,target=/root/.cache/uv \
+-  /uv pip install --no-cache-dir -r requirements.txt
++    --mount=type=bind,source=uv.lock,target=uv.lock \
++    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
++    uv sync --frozen --no-install-project --no-editable
+ 
+ # Copy only necessary files
+ COPY src/predictor/ /app/code/
+ COPY src/configs/model_config.py /app/code/configs/
+ COPY src/configs/database_config.py /app/code/configs/
+-COPY src/payload/model_models.py /app/code/payload/
++COPY src/payload/predictor_models.py /app/code/payload/
++COPY src/payload/shared_models.py /app/code/payload/
+ COPY src/database/ /app/code/database/
+ COPY .env /app/code/
+ 
+ WORKDIR /app/code/
+ 
+-CMD ["python", "-m", "uvicorn", "model:app", "--host", "0.0.0.0", "--port", "7070"]
+\ No newline at end of file
++CMD ["uv", "run", "uvicorn", "predictor:app", "--host", "0.0.0.0", "--port", "7070"]
+diff --git a/Dockerfile.processor b/Dockerfile.processor
+index 2e0d56c..db257bc 100644
+--- a/Dockerfile.processor
++++ b/Dockerfile.processor
+@@ -1,33 +1,39 @@
+-FROM ghcr.io/astral-sh/uv:latest AS builder
+ FROM python:3.12-slim-bullseye AS final
+ 
+-ENV VIRTUAL_ENV=/opt/venv
+-ENV PYTHONUNBUFFERED=1
+-ENV PYTHONDONTWRITEBYTECODE=1
++COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
++
++ENV UV_PYTHON_DOWNLOADS=never
++# Location of the virtual environment
++ENV UV_PROJECT_ENVIRONMENT="/venv"
++# Location of the python installation via uv
++ENV UV_PYTHON_INSTALL_DIR="/python"
++# Byte compile the python files on installation
++ENV UV_COMPILE_BYTECODE=1
++# Python verision to use
++ENV UV_PYTHON=python3.12
++# Tweaking the PATH variable for easier use
++ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
+ 
+ WORKDIR /app
+ 
+ # Install minimal required dependencies
+ RUN apt-get update && \
+-  apt-get install -y --no-install-recommends \
+-  git \
+-  && rm -rf /var/lib/apt/lists/*
+-
+-# Create and activate virtual environment
+-RUN python -m venv $VIRTUAL_ENV
+-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
++    apt-get install -y --no-install-recommends \
++    git \
++    && rm -rf /var/lib/apt/lists/*
+ 
+ # Install dependencies using uv
+-COPY --from=builder /uv /uv
+-COPY requirements.txt .
+ RUN --mount=type=cache,target=/root/.cache/uv \
+-  /uv pip install --no-cache-dir -r requirements.txt
++    --mount=type=bind,source=uv.lock,target=uv.lock \
++    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
++    uv sync --frozen --no-install-project --no-editable
+ 
+ # Copy only necessary files
+ COPY src/processor/ /app/code/
+ COPY src/configs/processor_config.py /app/code/configs/
+ COPY src/payload/processor_models.py /app/code/payload/
++COPY src/payload/shared_models.py /app/code/payload/
+ 
+ WORKDIR /app/code/
+ 
+-CMD ["python", "-m", "uvicorn", "processor:app", "--host", "0.0.0.0", "--port", "9090"]
+\ No newline at end of file
++CMD ["uv", "run", "uvicorn", "processor:app", "--host", "0.0.0.0", "--port", "9090"]
+diff --git a/Dockerfile.summarizer b/Dockerfile.summarizer
+index 9737cb1..310227f 100644
+--- a/Dockerfile.summarizer
++++ b/Dockerfile.summarizer
+@@ -1,30 +1,42 @@
+-FROM ghcr.io/astral-sh/uv:latest AS builder
+-FROM python:3.12-slim-bullseye AS final
++FROM python:3.12-slim-bullseye
+ 
+-ENV VIRTUAL_ENV=/opt/venv
+-ENV PYTHONUNBUFFERED=1
+-ENV PYTHONDONTWRITEBYTECODE=1
++COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
++
++ENV UV_PYTHON_DOWNLOADS=never
++# Location of the virtual environment
++ENV UV_PROJECT_ENVIRONMENT="/venv"
++# Location of the python installation via uv
++ENV UV_PYTHON_INSTALL_DIR="/python"
++# Byte compile the python files on installation
++ENV UV_COMPILE_BYTECODE=1
++# Python verision to use
++ENV UV_PYTHON=python3.12
++# Tweaking the PATH variable for easier use
++ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
+ 
+ WORKDIR /app
+ 
+-# Create and activate virtual environment
+-RUN python -m venv $VIRTUAL_ENV
+-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
++# Install minimal required dependencies
++RUN apt-get update && \
++    apt-get install -y --no-install-recommends \
++    git \
++    && rm -rf /var/lib/apt/lists/*
+ 
+ # Install dependencies using uv
+-COPY --from=builder /uv /uv
+-COPY requirements.txt .
+ RUN --mount=type=cache,target=/root/.cache/uv \
+-  /uv pip install --no-cache-dir -r requirements.txt
++    --mount=type=bind,source=uv.lock,target=uv.lock \
++    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
++    uv sync --frozen --no-install-project --no-editable
+ 
+ # Copy only necessary files
+ COPY src/summarization/ /app/code/
+ COPY src/configs/summarization_config.py /app/code/configs/
+ COPY src/configs/database_config.py /app/code/configs/
+ COPY src/payload/summarizer_models.py /app/code/payload/
++COPY src/payload/shared_models.py /app/code/payload/
+ COPY src/database/ /app/code/database/
+ COPY .env /app/code/
+ 
+ WORKDIR /app/code/
+ 
+-CMD ["python", "-m", "uvicorn", "summarizer:app", "--host", "0.0.0.0", "--port", "6060"]
+\ No newline at end of file
++CMD ["uv", "run", "uvicorn", "summarizer:app", "--host", "0.0.0.0", "--port", "6060"]
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 5bfd449..62ce144 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -4,13 +4,13 @@ services:
+     image: postgres:latest
+     restart: unless-stopped
+     healthcheck:
+-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+-      interval: 5s
++      test: ["CMD-SHELL", "pg_isready -U postgres"]
++      interval: 120s
+       timeout: 5s
+       retries: 5
+     environment:
+       POSTGRES_USER: postgres
+-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD environment variable is required}
++      POSTGRES_PASSWORD: postgres
+       POSTGRES_DB: document_classification
+       TZ: Europe/Warsaw
+     ports:
+@@ -85,6 +85,7 @@ services:
+     depends_on:
+       - processor
+       - database
++      - ollama
+     volumes:
+       - type: bind
+         source: logs
+@@ -111,13 +112,14 @@ services:
+         source: init-ollama.sh
+         target: /app/init-ollama.sh
+     healthcheck:
+-      test: ollama ps || exit 1
+-      interval: 5s
+-      timeout: 5s
++      test: "ollama --version && ollama ps || exit 1"
++      interval: 120s
++      timeout: 10s
+       retries: 5
++      start_period: 30s
+     networks:
+       - document-classification
+-    entrypoint: [ "/usr/bin/bash", "/app/init-ollama.sh" ]
++    entrypoint: ["/usr/bin/bash", "/app/init-ollama.sh"]
+ 
+   summarizer:
+     container_name: summarizer_service
+diff --git a/init-ollama.sh b/init-ollama.sh
+index 83a0451..e6aa7fa 100755
+--- a/init-ollama.sh
++++ b/init-ollama.sh
+@@ -1,16 +1,27 @@
+ #!/bin/bash
+ 
++# Selected model.
++MODEL=llama3.2:3b
++# MODEL=gemma2:2b
++
+ # Start Ollama in the background.
+-/bin/ollama serve &
+-# Record Process ID.
+-pid=$!
++echo "Starting Ollama server..."
++ollama serve &
++SERVE_PID=$!
++
++echo "Waiting for Ollama server to be active..."
++while ! ollama list | grep -q 'NAME'; do
++  sleep 1
++done
+ 
+-# Pause for Ollama to start.
+-sleep 5
++echo "🔴 Retrieve ${MODEL} model..."
++ollama pull ${MODEL}
++echo "🟢 Done!"
+ 
+-echo "🔴 Retrieve LLAMA3.2 3B model..."
+-ollama pull llama3.2:3b
++# Preload the model.
++echo "🔴 Preload ${MODEL} model..."
++ollama run ${MODEL} ""
+ echo "🟢 Done!"
+ 
+ # Wait for Ollama process to finish.
+-wait $pid
+\ No newline at end of file
++wait $SERVE_PID
+diff --git a/pyproject.toml b/pyproject.toml
+index 01dd4b2..f24f248 100644
+--- a/pyproject.toml
++++ b/pyproject.toml
+@@ -1,38 +1,29 @@
+ [project]
+-name = "DocumentClassification"
++name = "documentclassification"
+ version = "0.1.0"
+-description = "Default template for PDM package"
+-authors = [
+-    { name = "Jakub Zenon Kujawa", email = "ZK_Jakub@proton.me" },
+-]
++description = "Add your description here"
++readme = "README.md"
++requires-python = ">=3.12"
+ dependencies = [
+-    "torch>=2.5.0",
+-    "torchvision>=0.20.0",
+-    "torchaudio>=2.5.0",
++    "aiofiles>=24.1.0",
++    "asyncpg>=0.30.0",
++    "datasets>=3.1.0",
+     "easyocr>=1.7.2",
++    "fastapi[standard]>=0.115.5",
++    "lightning>=2.4.0",
++    "lingua-language-detector>=2.0.2",
++    "numpy>=2.1.3",
+     "pdf2image>=1.17.0",
+-    "fastapi[standard]>=0.115.3",
+-    "python-multipart>=0.0.16",
+     "pillow>=11.0.0",
+-    "numpy>=2.1.2",
+-    "rich>=13.9.3",
+-    "transformers>=4.46.0",
+-    "lightning>=2.4.0",
+-    "datasets>=3.1.0",
+-    "python-dotenv>=1.0.1",
++    "psutil>=6.1.0",
+     "psycopg2-binary>=2.9.10",
+-    "sqlalchemy[asyncio]>=2.0.36",
+-    "asyncpg>=0.30.0",
+     "pytesseract>=0.3.13",
+-    "langchain>=0.3.9",
+-    "langchain-ollama>=0.2.0",
+-    "psutil>=6.1.0",
+-    "aiofiles>=24.1.0",
++    "python-dotenv>=1.0.1",
++    "python-multipart>=0.0.18",
++    "rich>=13.9.4",
++    "sqlalchemy[asyncio]>=2.0.36",
++    "torch>=2.5.1",
++    "torchaudio>=2.5.1",
++    "torchvision>=0.20.1",
++    "transformers>=4.46.3",
+ ]
+-requires-python = ">=3.12,<3.13"
+-readme = "README.md"
+-license = { text = "MIT" }
+-
+-
+-[tool.pdm]
+-distribution = false
+diff --git a/setup-services.sh b/setup-services.sh
+index 9253d8c..0c23d15 100755
+--- a/setup-services.sh
++++ b/setup-services.sh
+@@ -5,7 +5,7 @@ usage() {
+     echo "Usage: $0 [-f|--force] [-d|--detach]  [-p|--password PASSWORD] [-r|--rebuild]"
+     echo "Options:"
+     echo "  -f, --force      Remove existing models and clone again"
+-    echo "  -d, --detach    Run in detached mode"
++    echo "  -d, --detach     Run in detached mode"
+     echo "  -p, --password   Set PostgreSQL password"
+     echo "  -r, --rebuild    Rebuild docker images"
+     echo "  -h, --help       Display this help message"
+@@ -77,4 +77,4 @@ elif [ "$REBUILD" = false ]; then
+ else
+     echo "Starting services..."
+     docker-compose up
+-fi
+\ No newline at end of file
++fi
+diff --git a/src/configs/model_config.py b/src/configs/model_config.py
+index 3f96599..c923311 100644
+--- a/src/configs/model_config.py
++++ b/src/configs/model_config.py
+@@ -1,6 +1,8 @@
+ from dataclasses import dataclass, field
+ from pathlib import Path
+ 
++import psutil
++
+ 
+ @dataclass(frozen=True)
+ class ModelConfig:
+@@ -26,7 +28,31 @@ class ModelConfig:
+             "questionnaire",
+             "resume",
+             "memo",
+-        ]
++        ],
+     )
+ 
+     SUMMARIZER_URL: str = "http://summarizer:6060/summarize"
++
++    # LLM specific parameters
++
++    # Ollama configuration
++    OLLAMA_BASE_URL: str = "http://ollama:11434"
++    MODEL_NAME: str = "llama3.2:3b"
++
++    # Summary constraints
++    MAX_INPUT_LENGTH: int = 10000
++    DEFAULT_MAX_LENGTH: int = 200
++    DEFAULT_MIN_LENGTH: int = 50
++
++    # Model parameters
++    TEMPERATURE: float = 0.7
++    TOP_P: float = 0.9
++    FREQUENCY_PENALTY: float = 0.0
++    PRESENCE_PENALTY: float = 0.0
++
++    # Llama specific parameters
++    NUM_CTX: int = 4096  # Context window size
++    NUM_GPU: int = 0
++    NUM_THREAD: int = field(
++        default_factory=lambda: psutil.cpu_count(logical=False) or 1,
++    )
+diff --git a/src/configs/ocr_config.py b/src/configs/ocr_config.py
+index 636eb25..c15cab6 100644
+--- a/src/configs/ocr_config.py
++++ b/src/configs/ocr_config.py
+@@ -1,6 +1,6 @@
+ from dataclasses import dataclass
+ from pathlib import Path
+-from typing import Final, Set
++from typing import Final
+ 
+ BYTE_MEGABYTE: Final[int] = 1024 * 1024
+ 
+@@ -14,14 +14,14 @@ class OCRConfig:
+     TARGET_SIZE: int = 1240
+     MAX_WORKERS: int = 4
+     LOG_DIR: Path = Path("/app/data/logs/ocr")
+-    ACCEPTED_FILE_TYPES: Set[str] = frozenset(
++    ACCEPTED_FILE_TYPES: frozenset[str] = frozenset(
+         {
+             "image/jpeg",
+             "image/png",
+             "image/jpg",
+             "image/webp",
+             "application/pdf",
+-        }
++        },
+     )
+     PROCESSOR_URL: str = "http://processor:9090/text-preprocess"
+     UPLOAD_DIR: Path = Path("/app/data/uploads")
+diff --git a/src/configs/summarization_config.py b/src/configs/summarization_config.py
+index cd7da42..8462c6d 100644
+--- a/src/configs/summarization_config.py
++++ b/src/configs/summarization_config.py
+@@ -1,4 +1,4 @@
+-from dataclasses import dataclass
++from dataclasses import dataclass, field
+ from pathlib import Path
+ 
+ import psutil
+@@ -29,4 +29,6 @@ class SummarizationConfig:
+     # Llama specific parameters
+     NUM_CTX: int = 4096  # Context window size
+     NUM_GPU: int = 0
+-    NUM_THREAD: int = psutil.cpu_count(logical=False)  # Number of CPU threads to use
++    NUM_THREAD: int = field(
++        default_factory=lambda: psutil.cpu_count(logical=False) or 1,
++    )
+diff --git a/src/database/__init__.py b/src/database/__init__.py
+index 66d9651..663661f 100644
+--- a/src/database/__init__.py
++++ b/src/database/__init__.py
+@@ -20,20 +20,20 @@ from .schemas import (
+ )
+ 
+ __all__ = [
++    "Base",
++    "ConnectionError",
+     "DatabaseConfig",
+     "DatabaseConnection",
+     "DatabaseError",
+-    "ConnectionError",
+-    "DocumentError",
+-    "DocumentNotFoundError",
+-    "DocumentSaveError",
+-    "DocumentUpdateError",
+-    "Base",
+     "Document",
+-    "DocumentRepository",
+     "DocumentBase",
+     "DocumentCreate",
+-    "DocumentUpdate",
++    "DocumentError",
++    "DocumentNotFoundError",
++    "DocumentRepository",
+     "DocumentResponse",
++    "DocumentSaveError",
++    "DocumentUpdate",
++    "DocumentUpdateError",
+     "get_repository",
+ ]
+diff --git a/src/database/connections.py b/src/database/connections.py
+index ef063c5..f66c68d 100644
+--- a/src/database/connections.py
++++ b/src/database/connections.py
+@@ -1,7 +1,7 @@
+ import logging
++from collections.abc import AsyncGenerator
+ from contextlib import asynccontextmanager
+ from datetime import datetime
+-from typing import AsyncGenerator
+ 
+ from sqlalchemy import text
+ from sqlalchemy.engine import URL
+@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import (
+ 
+ from configs.database_config import DatabaseConfig
+ 
+-from .exceptions import ConnectionError
++from .exceptions import ConnectionError as DBConnectionError
+ 
+ config = DatabaseConfig.from_env()
+ config.LOG_DIR.mkdir(parents=True, exist_ok=True)
+@@ -25,7 +25,8 @@ logging.basicConfig(
+     datefmt="%Y-%m-%d %H:%M:%S",
+     handlers=[
+         logging.FileHandler(
+-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
++            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
++            mode="a",
+         ),
+         logging.StreamHandler(),
+     ],
+@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
+ class DatabaseConnection:
+     """Manages database connection and session creation."""
+ 
+-    def __init__(self):
++    def __init__(self) -> None:
+         """Initialize database connection manager."""
+         self.engine = self._create_engine()
+         self.async_session_maker = async_sessionmaker(
+@@ -69,8 +70,9 @@ class DatabaseConnection:
+             )
+ 
+         except Exception as e:
+-            logger.error("Failed to create database engine: %s", str(e))
+-            raise ConnectionError("Failed to establish database connection") from e
++            logger.exception("Failed to create database engine")
++            error_msg = "Failed to establish database connection"
++            raise DBConnectionError(error_msg) from e
+ 
+     async def verify_connection(self) -> None:
+         """Verify database connection."""
+@@ -79,8 +81,9 @@ class DatabaseConnection:
+                 await conn.execute(text("SELECT 1"))
+             logger.info("Database connection verified successfully")
+         except Exception as e:
+-            logger.error("Failed to verify database connection: %s", str(e))
+-            raise ConnectionError("Failed to verify database connection") from e
++            logger.exception("Failed to verify database connection")
++            error_msg = "Failed to verify database connection"
++            raise DBConnectionError(error_msg) from e
+ 
+     @asynccontextmanager
+     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
+@@ -88,9 +91,9 @@ class DatabaseConnection:
+         async with self.async_session_maker() as session:
+             try:
+                 yield session
+-            except Exception as e:
++            except Exception:
+                 await session.rollback()
+-                logger.error("Database session error: %s", str(e))
++                logger.exception("Database session error")
+                 raise
+             finally:
+                 await session.close()
+diff --git a/src/database/dependencies.py b/src/database/dependencies.py
+index 95c7dc6..a1d6a82 100644
+--- a/src/database/dependencies.py
++++ b/src/database/dependencies.py
+@@ -1,4 +1,4 @@
+-from typing import AsyncGenerator
++from collections.abc import AsyncGenerator
+ 
+ from fastapi import Depends
+ from sqlalchemy.ext.asyncio import AsyncSession
+diff --git a/src/database/exceptions.py b/src/database/exceptions.py
+index a261b33..b2375ad 100644
+--- a/src/database/exceptions.py
++++ b/src/database/exceptions.py
+@@ -1,10 +1,21 @@
+-from typing import Optional
++from __future__ import annotations
+ 
+ 
+ class DatabaseError(Exception):
+     """Base exception for database operations."""
+ 
+-    def __init__(self, message: str, original_error: Optional[Exception] = None):
++    def __init__(
++        self,
++        message: str,
++        original_error: Exception | None = None,
++    ) -> None:
++        """Initialize DatabaseError exception.
++
++        Args:
++            message: Error message to display
++            original_error: Original exception that caused this error, if any
++
++        """
+         super().__init__(message)
+         self.original_error = original_error
+ 
+@@ -12,28 +23,18 @@ class DatabaseError(Exception):
+ class ConnectionError(DatabaseError):
+     """Raised when database connection fails."""
+ 
+-    pass
+-
+ 
+ class DocumentError(DatabaseError):
+     """Base exception for document-related operations."""
+ 
+-    pass
+-
+ 
+ class DocumentNotFoundError(DocumentError):
+     """Raised when a document is not found."""
+ 
+-    pass
+-
+ 
+ class DocumentSaveError(DocumentError):
+     """Raised when saving a document fails."""
+ 
+-    pass
+-
+ 
+ class DocumentUpdateError(DocumentError):
+     """Raised when updating a document fails."""
+-
+-    pass
+diff --git a/src/database/models.py b/src/database/models.py
+index 6a1c935..f21b7fc 100644
+--- a/src/database/models.py
++++ b/src/database/models.py
+@@ -1,5 +1,6 @@
++from __future__ import annotations
++
+ from datetime import datetime
+-from typing import Optional
+ 
+ from sqlalchemy import TIMESTAMP, Integer, String
+ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+@@ -8,8 +9,6 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+ class Base(DeclarativeBase):
+     """Base class for all database models."""
+ 
+-    pass
+-
+ 
+ class Document(Base):
+     """Document model with improved type hints and validation."""
+@@ -17,13 +16,26 @@ class Document(Base):
+     __tablename__ = "documents"
+ 
+     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+-    file_name: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
+-    file_path: Mapped[str] = mapped_column(String(255), nullable=False, unique=True)
++    file_name: Mapped[str] = mapped_column(
++        String(255),
++        nullable=False,
++        unique=True,
++    )
++    file_path: Mapped[str] = mapped_column(
++        String(255),
++        nullable=False,
++        unique=True,
++    )
+     created_at: Mapped[datetime] = mapped_column(
+-        TIMESTAMP, nullable=False, default=datetime.utcnow
++        TIMESTAMP,
++        nullable=False,
++        default=datetime.utcnow,
++    )
++    classification: Mapped[str | None] = mapped_column(
++        String(255),
++        nullable=True,
+     )
+-    classification: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+-    summary: Mapped[Optional[str]] = mapped_column(String, nullable=True)
++    summary: Mapped[str | None] = mapped_column(String, nullable=True)
+ 
+     def to_dict(self) -> dict:
+         """Convert document to dictionary."""
+diff --git a/src/database/repository.py b/src/database/repository.py
+index 8c46b46..a56f9f4 100644
+--- a/src/database/repository.py
++++ b/src/database/repository.py
+@@ -1,9 +1,10 @@
++from __future__ import annotations
++
+ from datetime import datetime
+-from typing import Sequence
++from typing import TYPE_CHECKING
+ 
+ from sqlalchemy import select
+ from sqlalchemy.exc import SQLAlchemyError
+-from sqlalchemy.ext.asyncio import AsyncSession
+ 
+ from .exceptions import (
+     DocumentError,
+@@ -12,23 +13,30 @@ from .exceptions import (
+     DocumentUpdateError,
+ )
+ from .models import Document
+-from .schemas import DocumentCreate, DocumentUpdate
++
++if TYPE_CHECKING:
++    from collections.abc import Sequence
++
++    from sqlalchemy.ext.asyncio import AsyncSession
++
++    from .schemas import DocumentCreate, DocumentUpdate
+ 
+ 
+ class DocumentRepository:
+     """Repository for document-related database operations."""
+ 
+-    def __init__(self, session: AsyncSession):
++    def __init__(self, session: AsyncSession) -> None:
+         """Initialize repository with database session."""
+         self.session = session
+ 
+     async def create(self, document: DocumentCreate) -> Document:
+         """Create a new document record."""
+         try:
++            now = datetime.now().astimezone()
+             db_document = Document(
+                 file_name=document.file_name,
+                 file_path=document.file_path,
+-                created_at=document.created_at or datetime.now(datetime.timezone.utc),
++                created_at=document.created_at or now,
+                 classification=document.classification,
+                 summary=document.summary,
+             )
+@@ -37,12 +45,15 @@ class DocumentRepository:
+             await self.session.commit()
+             await self.session.refresh(db_document)
+ 
+-            return db_document
+-
+         except SQLAlchemyError as e:
++            error_msg = f"Failed to save document {document.file_name}"
+             raise DocumentSaveError(
+-                f"Failed to save document {document.file_name}", original_error=e
+-            )
++                error_msg,
++                original_error=e,
++            ) from e
++
++        else:
++            return db_document
+ 
+     async def get_by_id(self, document_id: int) -> Document:
+         """Retrieve document by ID."""
+@@ -51,11 +62,15 @@ class DocumentRepository:
+         document = result.scalar_one_or_none()
+ 
+         if not document:
+-            raise DocumentNotFoundError(f"Document with ID {document_id} not found")
++            error_msg = f"Document with ID {document_id} not found"
++            raise DocumentNotFoundError(error_msg)
+         return document
+ 
+     async def get_by_filename(
+-        self, file_name: str, *, return_bool: bool = False
++        self,
++        file_name: str,
++        *,
++        return_bool: bool = False,
+     ) -> Document | bool:
+         """Retrieve document by filename."""
+         query = select(Document).filter(Document.file_name == file_name)
+@@ -65,7 +80,8 @@ class DocumentRepository:
+         if not document:
+             if return_bool:
+                 return False
+-            raise DocumentNotFoundError(f"Document {file_name} not found")
++            error_msg = f"Document {file_name} not found"
++            raise DocumentNotFoundError(error_msg)
+ 
+         return document
+ 
+@@ -75,7 +91,11 @@ class DocumentRepository:
+         result = await self.session.execute(query)
+         return result.scalars().all()
+ 
+-    async def update(self, document_id: int, update_data: DocumentUpdate) -> Document:
++    async def update(
++        self,
++        document_id: int,
++        update_data: DocumentUpdate,
++    ) -> Document:
+         """Update document attributes."""
+         try:
+             document = await self.get_by_id(document_id)
+@@ -87,46 +107,72 @@ class DocumentRepository:
+             await self.session.commit()
+             await self.session.refresh(document)
+ 
+-            return document
+-
+         except SQLAlchemyError as e:
++            error_msg = f"Failed to update document {document_id}"
+             raise DocumentUpdateError(
+-                f"Failed to update document {document_id}", original_error=e
+-            )
++                error_msg,
++                original_error=e,
++            ) from e
++
++        else:
++            return document
+ 
+     async def update_classification(
+-        self, file_name: str, classification: str
++        self,
++        file_name: str,
++        classification: str,
+     ) -> Document:
+         """Update document classification."""
+         try:
+-            document = await self.get_by_filename(file_name)
++            document = await self.get_by_filename(
++                file_name,
++                return_bool=False,
++            )
++
++            if not isinstance(document, Document):
++                error_msg = f"Document {file_name} not found"
++                raise DocumentNotFoundError(error_msg)
++
+             document.classification = classification
+ 
+             await self.session.commit()
+             await self.session.refresh(document)
+ 
+-            return document
+-
+         except SQLAlchemyError as e:
++            error_msg = f"Failed to update classification for {file_name}"
+             raise DocumentUpdateError(
+-                f"Failed to update classification for {file_name}", original_error=e
+-            )
++                error_msg,
++                original_error=e,
++            ) from e
++
++        else:
++            return document
+ 
+     async def update_summary(self, file_name: str, summary: str) -> Document:
+         """Update document summary."""
+         try:
+-            document = await self.get_by_filename(file_name)
++            document = await self.get_by_filename(
++                file_name,
++                return_bool=False,
++            )
++            if not isinstance(document, Document):
++                error_msg = f"Document {file_name} not found"
++                raise DocumentNotFoundError(error_msg)
++
+             document.summary = summary
+ 
+             await self.session.commit()
+             await self.session.refresh(document)
+ 
+-            return document
+-
+         except SQLAlchemyError as e:
++            error_msg = f"Failed to update summary for {file_name}"
+             raise DocumentUpdateError(
+-                f"Failed to update summary for {file_name}", original_error=e
+-            )
++                error_msg,
++                original_error=e,
++            ) from e
++
++        else:
++            return document
+ 
+     async def delete(self, document_id: int) -> None:
+         """Delete document by ID."""
+@@ -136,6 +182,8 @@ class DocumentRepository:
+             await self.session.commit()
+ 
+         except SQLAlchemyError as e:
++            error_msg = f"Failed to delete document {document_id}"
+             raise DocumentError(
+-                f"Failed to delete document {document_id}", original_error=e
+-            )
++                error_msg,
++                original_error=e,
++            ) from e
+diff --git a/src/database/schemas.py b/src/database/schemas.py
+index 4a90c39..c32a171 100644
+--- a/src/database/schemas.py
++++ b/src/database/schemas.py
+@@ -1,5 +1,6 @@
++from __future__ import annotations
++
+ from datetime import datetime
+-from typing import Optional
+ 
+ from pydantic import BaseModel, Field
+ 
+@@ -10,25 +11,25 @@ class DocumentBase(BaseModel):
+     file_name: str = Field(..., description="Name of the document file")
+     file_path: str = Field(..., description="Path to the document file")
+     created_at: datetime = Field(
+-        default_factory=datetime.utcnow, description="Document creation timestamp"
++        default_factory=datetime.utcnow,
++        description="Document creation timestamp",
+     )
+-    classification: Optional[str] = Field(
+-        None, description="Document classification category"
++    classification: str | None = Field(
++        None,
++        description="Document classification category",
+     )
+-    summary: Optional[str] = Field(None, description="Document summary text")
++    summary: str | None = Field(None, description="Document summary text")
+ 
+ 
+ class DocumentCreate(DocumentBase):
+     """Schema for creating a new document."""
+ 
+-    pass
+-
+ 
+ class DocumentUpdate(BaseModel):
+     """Schema for updating document attributes."""
+ 
+-    classification: Optional[str] = None
+-    summary: Optional[str] = None
++    classification: str | None = None
++    summary: str | None = None
+ 
+ 
+ class DocumentResponse(DocumentBase):
+diff --git a/src/ocr/__init__.py b/src/ocr/__init__.py
+new file mode 100644
+index 0000000..705c02d
+--- /dev/null
++++ b/src/ocr/__init__.py
+@@ -0,0 +1 @@
++# src/ocr/__init__.py
+diff --git a/src/ocr/optimized_ocr.py b/src/ocr/easy_ocr_wrapper.py
+similarity index 85%
+rename from src/ocr/optimized_ocr.py
+rename to src/ocr/easy_ocr_wrapper.py
+index 757b3f1..2c55582 100644
+--- a/src/ocr/optimized_ocr.py
++++ b/src/ocr/easy_ocr_wrapper.py
+@@ -7,13 +7,20 @@ from numpy.typing import NDArray
+ from PIL import Image
+ 
+ from configs.ocr_config import OCRConfig
+-from payload.ocr_models import OCRResponse, OCRResult
++from payload.ocr_models import OCRResponse
++from payload.shared_models import OCRResult
+ 
+ 
+ class ImagePreprocessor:
+     """Handle image preprocessing operations."""
+ 
+     def __init__(self, target_size: int) -> None:
++        """Initialize the image preprocessor.
++
++        Args:
++            target_size: Maximum dimension size to resize images to
++
++        """
+         self.target_size = target_size
+         self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+ 
+@@ -24,15 +31,15 @@ class ImagePreprocessor:
+ 
+         width, height = image.size
+         scale = min(self.target_size / width, self.target_size / height)
+-        new_size = tuple(int(dim * scale) for dim in (width, height))
++        new_size = (int(width * scale), int(height * scale))
+ 
+         return image.resize(new_size, resample=Image.Resampling.LANCZOS)
+ 
+     def enhance_image(self, image: NDArray[np.uint8]) -> NDArray[np.uint8]:
+         """Apply image enhancement techniques."""
+         enhanced = self._clahe.apply(image)
+-
+-        return cv2.fastNlMeansDenoising(enhanced)
++        denoised = cv2.fastNlMeansDenoising(enhanced)
++        return np.array(denoised, dtype=np.uint8)
+ 
+     def preprocess(self, image: Image.Image) -> NDArray[np.uint8]:
+         """Complete image preprocessing pipeline."""
+@@ -45,7 +52,7 @@ class ImagePreprocessor:
+         return self.enhance_image(image_array)
+ 
+ 
+-class OptimizedOCR:
++class EasyOCRWrapper:
+     """Optimized OCR processing with performance enhancements."""
+ 
+     def __init__(self, config: OCRConfig) -> None:
+@@ -83,11 +90,12 @@ class OptimizedOCR:
+                 for bbox, word, _ in results
+             ]
+         except Exception as e:
+-            logging.error("Error processing image: %s", str(e))
++            logging.exception("Error processing image: %s", str(e))
+             return []
+ 
+     def process_batch(
+-        self, images: list[Image.Image]
++        self,
++        images: list[Image.Image],
+     ) -> tuple[OCRResponse, list[Image.Image]]:
+         """Process multiple images in optimized batch."""
+         processed = [self.preprocessor.preprocess(image) for image in images]
+diff --git a/src/ocr/ocr.py b/src/ocr/ocr.py
+index 8f6fe17..cfec679 100644
+--- a/src/ocr/ocr.py
++++ b/src/ocr/ocr.py
+@@ -1,23 +1,40 @@
++from __future__ import annotations
++
+ import base64
+ import io
+ import logging
+ from datetime import datetime
+ from pathlib import Path
+-from typing import AsyncGenerator, Optional
++from typing import TYPE_CHECKING
+ 
+ import aiofiles
+-import requests
+-from fastapi import Depends, FastAPI, HTTPException, UploadFile, status
++import aiohttp
++from fastapi import (
++    Depends,
++    FastAPI,
++    HTTPException,
++    UploadFile,
++    status,
++)
+ from pdf2image import convert_from_bytes
+ from pdf2image.exceptions import PDFPageCountError
+ from PIL import Image
+-from tesseract import TesseractOCR
++from tesseract_wrapper import TesseractWrapper
+ 
+ from configs.ocr_config import OCRConfig
+-from database import DocumentCreate, DocumentError, DocumentRepository, get_repository
+-from database.models import Document
++from database import (
++    DocumentCreate,
++    DocumentError,
++    DocumentRepository,
++    get_repository,
++)
+ from utils.utils import get_unique_filename
+ 
++if TYPE_CHECKING:
++    from collections.abc import AsyncGenerator
++
++    from database.models import Document
++
+ config = OCRConfig()
+ config.LOG_DIR.mkdir(parents=True, exist_ok=True)
+ config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+@@ -29,7 +46,8 @@ logging.basicConfig(
+     datefmt="%Y-%m-%d %H:%M:%S",
+     handlers=[
+         logging.FileHandler(
+-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
++            config.LOG_DIR / f"{datetime.now(tz=datetime.UTC):%Y-%m-%d}.log",
++            mode="a",
+         ),
+         logging.StreamHandler(),
+     ],
+@@ -38,25 +56,39 @@ logging.basicConfig(
+ logger = logging.getLogger(__name__)
+ 
+ app = FastAPI()
+-# optimizer = OptimizedOCR(config=config)
+-optimizer = TesseractOCR(config=config)
++# optimizer = EasyOCRWrapper(config=config)
++optimizer = TesseractWrapper(config=config)
+ 
+ 
+ class OCRProcessor:
+     """Handle OCR processing operations."""
+ 
+-    def __init__(self, document_repository: DocumentRepository):
++    def __init__(self, document_repository: DocumentRepository) -> None:
+         """Initialize OCR processor with repository."""
+         self.repository = document_repository
+ 
+-    async def validate_file(self, file: UploadFile) -> Optional[str]:
++    async def validate_file(self, file: UploadFile) -> str:
+         """Validate uploaded file against constraints."""
+         logger.info("Validating file: %s", file.filename)
++        if not file.filename:
++            raise HTTPException(
++                status_code=status.HTTP_400_BAD_REQUEST,
++                detail="Filename is required",
++            )
+         new_filename = file.filename
+ 
+-        if await self.repository.get_by_filename(file.filename, return_bool=True):
+-            logger.info("File already exists: %s, making it unique", file.filename)
+-            new_filename = await get_unique_filename(file.filename, self.repository)
++        if await self.repository.get_by_filename(
++            file.filename,
++            return_bool=True,
++        ):
++            logger.info(
++                "File already exists: %s, making it unique",
++                file.filename,
++            )
++            new_filename = await get_unique_filename(
++                file.filename,
++                self.repository,
++            )
+             logger.info("New unique filename: %s", new_filename)
+ 
+         if file.content_type not in config.ACCEPTED_FILE_TYPES:
+@@ -66,6 +98,12 @@ class OCRProcessor:
+                 detail="Unsupported file type",
+             )
+ 
++        if not file.size:
++            raise HTTPException(
++                status_code=status.HTTP_400_BAD_REQUEST,
++                detail="Empty file",
++            )
++
+         if file.size > config.FILE_SIZE_LIMIT:
+             logger.error("File size too large: %s bytes", file.size)
+             raise HTTPException(
+@@ -82,12 +120,12 @@ class OCRProcessor:
+                         status_code=status.HTTP_400_BAD_REQUEST,
+                         detail=f"PDF exceeds {config.MAX_PDF_PAGES} pages",
+                     )
+-            except PDFPageCountError as e:
+-                logger.error("PDF processing error: %s", str(e))
++            except PDFPageCountError as err:
++                logger.exception("PDF processing error")
+                 raise HTTPException(
+                     status_code=status.HTTP_400_BAD_REQUEST,
+                     detail="Invalid or corrupted PDF file",
+-                ) from e
++                ) from err
+             finally:
+                 file.file.seek(0)
+ 
+@@ -109,11 +147,12 @@ class OCRProcessor:
+         encoded_images = []
+ 
+         for img in images:
+-            if img.mode in ("RGBA", "P"):
+-                img = img.convert("RGB")
++            converted_img = img
++            if converted_img.mode in ("RGBA", "P"):
++                converted_img = converted_img.convert("RGB")
+ 
+             with io.BytesIO() as buffer:
+-                img.save(buffer, format="JPEG")
++                converted_img.save(buffer, format="JPEG")
+                 img_byte_arr = buffer.getvalue()
+ 
+                 encoded = base64.b64encode(img_byte_arr).decode("utf-8")
+@@ -124,31 +163,34 @@ class OCRProcessor:
+     async def save_document(self, file_name: str) -> Document:
+         """Save document metadata to database."""
+         try:
+-            document = await self.repository.create(
++            return await self.repository.create(
+                 DocumentCreate(
+                     file_name=file_name,
+                     file_path=str(config.UPLOAD_DIR / file_name),
+-                )
++                    classification="",
++                    summary="",
++                ),
+             )
+-            return document
+-        except DocumentError as e:
+-            logger.error("Failed to save document: %s", str(e))
++        except DocumentError as err:
++            logger.exception("Failed to save document")
+             raise HTTPException(
+                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                 detail="Failed to save document",
+-            ) from e
++            ) from err
+ 
+ 
+ @app.get("/documents")
+ async def get_docs(
+-    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
++    repository: AsyncGenerator[DocumentRepository, None] = Depends(
++        get_repository,
++    ),
+ ) -> list[dict]:
+     """Get all documents."""
+     try:
+         documents = await repository.get_all()
+         return [doc.to_dict() for doc in documents]
+     except DocumentError as e:
+-        logger.error("Failed to retrieve documents: %s", str(e))
++        logger.exception("Failed to retrieve documents: %s", str(e))
+         raise HTTPException(
+             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+             detail="Failed to retrieve documents",
+@@ -158,7 +200,9 @@ async def get_docs(
+ @app.post("/ocr")
+ async def process_document(
+     file: UploadFile,
+-    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
++    repository: AsyncGenerator[DocumentRepository, None] = Depends(
++        get_repository,
++    ),
+ ) -> dict[str, str]:
+     """Process document for OCR and forward results."""
+     logger.info("Processing document: %s", file.filename)
+@@ -194,54 +238,55 @@ async def process_document(
+ 
+         # Forward to processor service
+         try:
+-            response = requests.post(
+-                config.PROCESSOR_URL,
+-                json={
+-                    "ocr_result": ocr_response.model_dump(exclude={"page_count"})[
+-                        "results"
+-                    ],
+-                    "images": encoded_images,
+-                    "file_name": file.filename,
+-                },
+-                timeout=300,
+-            )
+-
+-            # If processor request fails, raises HTTPException
+-            response.raise_for_status()
+-
+-            return response.json()
+-
+-        except (requests.RequestException, HTTPException) as e:
++            timeout = aiohttp.ClientTimeout(total=480)
++            async with (
++                aiohttp.ClientSession() as session,
++                session.post(
++                    config.PROCESSOR_URL,
++                    json={
++                        "ocr_result": ocr_response.model_dump(
++                            exclude={"page_count"},
++                        )["results"],
++                        "images": encoded_images,
++                        "file_name": file.filename,
++                    },
++                    timeout=timeout,
++                ) as response,
++            ):
++                response.raise_for_status()
++                return await response.json()
++
++        except (aiohttp.ClientError, HTTPException) as e:
+             await cleanup(repository, document_id, output_file)
+-            logger.error("Downstream processing failed: %s", str(e))
++            logger.exception("Downstream processing failed")
+             raise HTTPException(
+                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                 detail="Document processing failed in downstream service",
+-            )
++            ) from e
+ 
+     except Exception as e:
+         await cleanup(repository, document_id, output_file)
+-        logger.error("Processing error: %s", str(e))
++        logger.exception("Processing error")
+         raise HTTPException(
+             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+             detail="Document processing failed",
+-        )
++        ) from e
+ 
+ 
+ async def cleanup(
+     repository: DocumentRepository,
+-    document_id: Optional[int],
+-    output_file: Optional[Path],
++    document_id: int | None,
++    output_file: Path | None,
+ ) -> None:
+     """Clean up resources on error."""
+     if document_id:
+         try:
+             await repository.delete(document_id)
+         except DocumentError as e:
+-            logger.error("Failed to delete document: %s", str(e))
++            logger.exception("Failed to delete document: %s", str(e))
+ 
+     if output_file and output_file.exists():
+         try:
+             output_file.unlink()
+         except OSError as e:
+-            logger.error("Failed to delete file: %s", str(e))
++            logger.exception("Failed to delete file: %s", str(e))
+diff --git a/src/ocr/tesseract.py b/src/ocr/tesseract_wrapper.py
+similarity index 72%
+rename from src/ocr/tesseract.py
+rename to src/ocr/tesseract_wrapper.py
+index 35ca7fd..43c347a 100644
+--- a/src/ocr/tesseract.py
++++ b/src/ocr/tesseract_wrapper.py
+@@ -1,19 +1,32 @@
++from __future__ import annotations
++
+ import logging
++from typing import TYPE_CHECKING
+ 
+ import cv2
+ import numpy as np
+ import pytesseract
+-from numpy.typing import NDArray
+ from PIL import Image
+ 
+-from configs.ocr_config import OCRConfig
+-from payload.ocr_models import OCRResponse, OCRResult
++from payload.ocr_models import OCRResponse
++from payload.shared_models import OCRResult
++
++if TYPE_CHECKING:
++    from numpy.typing import NDArray
++
++    from configs.ocr_config import OCRConfig
+ 
+ 
+ class ImagePreprocessor:
+     """Handle image preprocessing operations."""
+ 
+     def __init__(self, target_size: int) -> None:
++        """Initialize image preprocessor.
++
++        Args:
++            target_size: Maximum size for image dimension.
++
++        """
+         self.target_size = target_size
+         self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+ 
+@@ -24,15 +37,19 @@ class ImagePreprocessor:
+ 
+         width, height = image.size
+         scale = min(self.target_size / width, self.target_size / height)
+-        new_size = tuple(int(dim * scale) for dim in (width, height))
++        new_size = (int(width * scale), int(height * scale))
+ 
+         return image.resize(new_size, resample=Image.Resampling.LANCZOS)
+ 
+     def enhance_image(self, image: NDArray[np.uint8]) -> NDArray[np.uint8]:
+         """Apply image enhancement techniques."""
+         # Convert to grayscale if not already
+-        if len(image.shape) == 3:
+-            image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
++        CHANNELS_RGB = 3
++        if len(image.shape) == CHANNELS_RGB:
++            image = np.asarray(
++                cv2.cvtColor(image, cv2.COLOR_RGB2GRAY),
++                dtype=np.uint8,
++            )
+ 
+         # Apply CLAHE for contrast enhancement
+         enhanced = self._clahe.apply(image)
+@@ -41,9 +58,14 @@ class ImagePreprocessor:
+         denoised = cv2.fastNlMeansDenoising(enhanced)
+ 
+         # Binarization using Otsu's method
+-        _, binary = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
++        _, binary = cv2.threshold(
++            denoised,
++            0,
++            255,
++            cv2.THRESH_BINARY + cv2.THRESH_OTSU,
++        )
+ 
+-        return binary
++        return np.asarray(binary, dtype=np.uint8)
+ 
+     def preprocess(self, image: Image.Image) -> NDArray[np.uint8]:
+         """Complete image preprocessing pipeline."""
+@@ -57,7 +79,7 @@ class ImagePreprocessor:
+         return self.enhance_image(image_array)
+ 
+ 
+-class TesseractOCR:
++class TesseractWrapper:
+     """OCR processing with Tesseract."""
+ 
+     def __init__(self, config: OCRConfig) -> None:
+@@ -79,28 +101,33 @@ class TesseractOCR:
+ 
+         Returns:
+             list[int]: Standardized bounding box [x_min, y_min, x_max, y_max]
++
+         """
+         if isinstance(bbox_data, tuple) and len(bbox_data) == 4:
+             # Handle Tesseract format (x, y, width, height)
+             x, y, w, h = bbox_data
+             return [int(x), int(y), int(x + w), int(y + h)]
+-        else:
+-            # Handle original format (list of coordinate tuples)
+-            xs, ys = zip(*bbox_data)
+-            return [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
++        # Handle original format (list of coordinate tuples)
++        xs, ys = zip(*bbox_data)
++        return [int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))]
+ 
+     def _process_single(self, image: NDArray[np.uint8]) -> list[OCRResult]:
+         """Process a single image with Tesseract."""
+         try:
+             results = pytesseract.image_to_data(
+-                image, output_type=pytesseract.Output.DICT, config=self.custom_config
++                image,
++                output_type=pytesseract.Output.DICT,
++                config=self.custom_config,
+             )
+ 
+             ocr_results = []
+             n_boxes = len(results["text"])
+ 
+             for i in range(n_boxes):
+-                if int(results["conf"][i]) < 0 or not results["text"][i].strip():
++                if (
++                    int(results["conf"][i]) < 0
++                    or not results["text"][i].strip()
++                ):
+                     continue
+ 
+                 # Create bbox_data tuple for compatibility
+@@ -110,21 +137,26 @@ class TesseractOCR:
+                         results["top"][i],
+                         results["width"][i],
+                         results["height"][i],
+-                    )
++                    ),
+                 )
+ 
+                 ocr_results.append(
+-                    OCRResult(bounding_box=bbox, word=results["text"][i].strip())
++                    OCRResult(
++                        bounding_box=bbox,
++                        word=results["text"][i].strip(),
++                    ),
+                 )
+ 
+-            return ocr_results
+-
+         except Exception as e:
+-            logging.error("Error processing image: %s", str(e))
++            logging.exception("Error processing image: %s", str(e))
+             return []
+ 
++        else:
++            return ocr_results
++
+     def process_batch(
+-        self, images: list[Image.Image]
++        self,
++        images: list[Image.Image],
+     ) -> tuple[OCRResponse, list[Image.Image]]:
+         """Process multiple images in optimized batch."""
+         # Preprocess all images
+diff --git a/src/payload/model_models.py b/src/payload/model_models.py
+deleted file mode 100644
+index eab2f64..0000000
+--- a/src/payload/model_models.py
++++ /dev/null
+@@ -1,39 +0,0 @@
+-from dataclasses import dataclass
+-
+-import torch
+-from pydantic import BaseModel, ConfigDict
+-
+-
+-@dataclass
+-class PagePrediction:
+-    """Stores prediction results for a single page."""
+-
+-    page_number: int
+-    logits: torch.Tensor
+-    confidence: float
+-    predicted_class: str
+-    text_length: int
+-
+-
+-class ProcessorResult(BaseModel):
+-    """Result data for document processing."""
+-
+-    input_ids: list
+-    attention_mask: list
+-    bbox: list
+-    pixel_values: list
+-    file_name: str
+-    text: str
+-
+-    model_config = ConfigDict(
+-        arbitrary_types_allowed=True,
+-        json_schema_extra={
+-            "example": {
+-                "input_ids": [[1, 2, 3, 4, 5]],
+-                "attention_mask": [[1, 1, 1, 1, 1]],
+-                "bbox": [[0, 0, 100, 50]],
+-                "pixel_values": [[0, 0, 0, 255, 255, 255]],
+-                "file_name": "example.pdf",
+-            }
+-        },
+-    )
+diff --git a/src/payload/ocr_models.py b/src/payload/ocr_models.py
+index a127e8d..59ca23c 100644
+--- a/src/payload/ocr_models.py
++++ b/src/payload/ocr_models.py
+@@ -1,33 +1,14 @@
+ from pydantic import BaseModel, ConfigDict, Field
+ 
+-
+-class OCRResult(BaseModel):
+-    """Structured OCR result using Pydantic BaseModel."""
+-
+-    bounding_box: list[int] = Field(
+-        ...,
+-        description="Coordinates of bounding box [x_min, y_min, x_max, y_max]",
+-        min_items=4,
+-        max_items=4,
+-    )
+-    word: str = Field(..., description="Recognized text")
+-
+-    model_config = ConfigDict(
+-        frozen=True,
+-        json_schema_extra={
+-            "example": {
+-                "bounding_box": [100, 100, 200, 150],
+-                "word": "Example",
+-            }
+-        },
+-    )
++from .shared_models import OCRResult
+ 
+ 
+ class OCRResponse(BaseModel):
+     """Response model for OCR processing."""
+ 
+     results: list[list[OCRResult]] = Field(
+-        ..., description="list of OCR results from the document"
++        ...,
++        description="list of OCR results from the document",
+     )
+ 
+     page_count: int = Field(1, description="Number of pages processed", ge=1)
+diff --git a/src/payload/predictor_models.py b/src/payload/predictor_models.py
+new file mode 100644
+index 0000000..022c6c7
+--- /dev/null
++++ b/src/payload/predictor_models.py
+@@ -0,0 +1,14 @@
++from dataclasses import dataclass
++
++import torch
++
++
++@dataclass
++class PagePrediction:
++    """Stores prediction results for a single page."""
++
++    page_number: int
++    logits: torch.Tensor
++    confidence: float
++    predicted_class: str
++    text_length: int
+diff --git a/src/payload/processor_models.py b/src/payload/processor_models.py
+index c0e8b3e..7751e02 100644
+--- a/src/payload/processor_models.py
++++ b/src/payload/processor_models.py
+@@ -1,38 +1,6 @@
+-import torch
+ from pydantic import BaseModel, ConfigDict, Field
+ 
+-
+-class BoundingBox(BaseModel):
+-    """Represents a bounding box for OCR results."""
+-
+-    coordinates: list[int] = Field(
+-        ...,
+-        min_items=4,
+-        max_items=4,
+-        description="Coordinates in format [x_min, y_min, x_max, y_max]",
+-    )
+-
+-
+-class OCRResult(BaseModel):
+-    """Structured OCR result using Pydantic BaseModel."""
+-
+-    bounding_box: list[int] = Field(
+-        ...,
+-        description="Coordinates of bounding box [x_min, y_min, x_max, y_max]",
+-        min_items=4,
+-        max_items=4,
+-    )
+-    word: str = Field(..., description="Recognized text")
+-
+-    model_config = ConfigDict(
+-        frozen=True,
+-        json_schema_extra={
+-            "example": {
+-                "bounding_box": [100, 100, 200, 150],
+-                "word": "Example",
+-            }
+-        },
+-    )
++from .shared_models import OCRResult
+ 
+ 
+ class ProcessorInput(BaseModel):
+@@ -45,29 +13,30 @@ class ProcessorInput(BaseModel):
+     model_config = ConfigDict(
+         json_schema_extra={
+             "example": {
+-                "ocr_result": [{"word": "Example", "bounding_box": [0, 0, 100, 50]}],
++                "ocr_result": [
++                    {"word": "Example", "bounding_box": [0, 0, 100, 50]},
++                ],
+                 "images": ["base64_encoded_image_string"],
+-            }
+-        }
++            },
++        },
+     )
+ 
+ 
+-class ProcessorResult(BaseModel):
++class ProcessorOutput(BaseModel):
+     """Result data for document processing."""
+ 
+-    input_ids: torch.Tensor
+-    attention_mask: torch.Tensor
+-    bbox: torch.Tensor
+-    pixel_values: torch.Tensor
++    input_ids: list
++    attention_mask: list
++    bbox: list
++    pixel_values: list
+ 
+     model_config = ConfigDict(
+-        arbitrary_types_allowed=True,
+         json_schema_extra={
+             "example": {
+                 "input_ids": [[1, 2, 3, 4, 5]],
+                 "attention_mask": [[1, 1, 1, 1, 1]],
+                 "bbox": [[0, 0, 100, 50]],
+                 "pixel_values": [[0, 0, 0, 255, 255, 255]],
+-            }
++            },
+         },
+     )
+diff --git a/src/payload/shared_models.py b/src/payload/shared_models.py
+new file mode 100644
+index 0000000..0703db3
+--- /dev/null
++++ b/src/payload/shared_models.py
+@@ -0,0 +1,51 @@
++from __future__ import annotations
++
++from pydantic import BaseModel, ConfigDict, Field
++
++
++class OCRResult(BaseModel):
++    """Structured OCR result using Pydantic BaseModel."""
++
++    bounding_box: list[int] = Field(
++        default=...,
++        min_length=4,
++        max_length=4,
++        description="Coordinates in format [x_min, y_min, x_max, y_max]",
++    )
++    word: str = Field(..., description="Recognized text")
++
++    model_config = ConfigDict(
++        frozen=True,
++        json_schema_extra={
++            "example": {
++                "bounding_box": [100, 100, 200, 150],
++                "word": "Example",
++            },
++        },
++    )
++
++
++class ProcessorResult(BaseModel):
++    """Result data for document processing."""
++
++    input_ids: list | None
++    attention_mask: list | None
++    bbox: list | None
++    pixel_values: list | None
++    file_name: str = Field(..., description="Name of the processed file")
++    text: str = Field(..., description="Text extracted from OCR")
++    language: str = Field(..., description="Detected language")
++
++    model_config = ConfigDict(
++        json_schema_extra={
++            "example": {
++                "input_ids": [[1, 2, 3, 4, 5]],
++                "attention_mask": [[1, 1, 1, 1, 1]],
++                "bbox": [[0, 0, 100, 50]],
++                "pixel_values": [[0, 0, 0, 255, 255, 255]],
++                "file_name": "example.pdf",
++                "text": "Example text",
++                "language": "en",
++            },
++        },
++    )
+diff --git a/src/payload/summarizer_models.py b/src/payload/summarizer_models.py
+index b28419a..44f64d5 100644
+--- a/src/payload/summarizer_models.py
++++ b/src/payload/summarizer_models.py
+@@ -1,5 +1,3 @@
+-# src/summarization/summarizer.py
+-
+ from pydantic import BaseModel, Field
+ 
+ 
+@@ -8,4 +6,13 @@ class SummarizationRequest(BaseModel):
+ 
+     file_name: str = Field(..., description="Name of the file to summarize")
+     text: str = Field(..., description="Text content to summarize")
+-    classification: str = Field(..., description="Predicted classes for the text")
++    classification: str = Field(
++        ..., description="Predicted classes for the text"
++    )
++
++
++class SummaryResponse(BaseModel):
++    """Structured response from the summarization model."""
++
++    summary: str = Field(..., description="Generated summary text")
++    word_count: int = Field(..., description="Number of words in summary")
+diff --git a/src/predictor/layoutlm_wrapper.py b/src/predictor/layoutlm_wrapper.py
+new file mode 100644
+index 0000000..58512f8
+--- /dev/null
++++ b/src/predictor/layoutlm_wrapper.py
+@@ -0,0 +1,139 @@
++import lightning.pytorch as pl
++import torch
++from torchmetrics import Accuracy
++from transformers import LayoutLMv3ForSequenceClassification
++
++from configs.model_config import ModelConfig
++
++
++class LayoutLMV3Wrapper(pl.LightningModule):
++    """PyTorch Lightning module for document classification using LayoutLMv3."""
++
++    def __init__(self, config: ModelConfig) -> None:
++        """Initialize the model.
++
++        Args:
++            n_classes: Number of document classes to predict
++
++        """
++        super().__init__()
++        self.n_classes = len(config.DOCUMENT_CLASSES)
++        self.model = LayoutLMv3ForSequenceClassification.from_pretrained(
++            "/app/data/models/layoutlmv3-base-finetuned-rvlcdip",
++            num_labels=self.n_classes,
++            use_safetensors=True,
++        )
++        self.config = config
++        self.model.config.id2label = dict(enumerate(config.DOCUMENT_CLASSES))
++        self.model.config.label2id = {
++            v: k for k, v in enumerate(config.DOCUMENT_CLASSES)
++        }
++        self.train_accuracy = Accuracy(
++            task="multiclass",
++            num_classes=self.n_classes,
++        )
++        self.val_accuracy = Accuracy(
++            task="multiclass",
++            num_classes=self.n_classes,
++        )
++
++    def forward(
++        self,
++        input_ids: torch.Tensor,
++        attention_mask: torch.Tensor,
++        bbox: torch.Tensor,
++        pixel_values: torch.Tensor,
++    ) -> object:
++        """Forward pass through the model.
++
++        Args:
++            input_ids: Input token IDs
++            attention_mask: Attention mask
++            bbox: Bounding box coordinates
++            pixel_values: Image pixel values
++
++        Returns:
++            Model output containing logits and loss
++
++        """
++        return self.model(
++            input_ids,
++            attention_mask=attention_mask,
++            bbox=bbox,
++            pixel_values=pixel_values,
++        )
++
++    def training_step(
++        self,
++        batch: dict[str, torch.Tensor],
++        batch_idx: int,  # noqa: ARG002
++    ) -> torch.Tensor:
++        """Training step for one batch.
++
++        Args:
++            batch: Dictionary containing batch data
++            batch_idx: Index of current batch (unused)
++
++        Returns:
++            Training loss
++
++        """
++        input_ids = batch["input_ids"]
++        attention_mask = batch["attention_mask"]
++        bbox = batch["bbox"]
++        pixel_values = batch["pixel_values"]
++        labels = batch["labels"]
++
++        output = self(input_ids, attention_mask, bbox, pixel_values, labels)
++
++        self.log("train_loss", output.loss)
++        self.log(
++            "train_acc",
++            self.train_accuracy(output.logits, labels),
++            on_step=True,
++            on_epoch=True,
++        )
++
++        return output.loss
++
++    def validation_step(
++        self,
++        batch: dict[str, torch.Tensor],
++        batch_idx: int,  # noqa: ARG002
++    ) -> torch.Tensor:
++        """Execute validation step for one batch.
++
++        Args:
++            batch: Dictionary containing batch data
++            batch_idx: Index of current batch (unused)
++
++        Returns:
++            Validation loss
++
++        """
++        input_ids = batch["input_ids"]
++        attention_mask = batch["attention_mask"]
++        bbox = batch["bbox"]
++        pixel_values = batch["pixel_values"]
++        labels = batch["labels"]
++
++        output = self(input_ids, attention_mask, bbox, pixel_values, labels)
++
++        self.log("val_loss", output.loss)
++        self.log(
++            "val_acc",
++            self.val_accuracy(output.logits, labels),
++            on_step=False,
++            on_epoch=True,
++        )
++
++        return output.loss
++
++    def configure_optimizers(self) -> torch.optim.Optimizer:
++        """Configure optimizers for training.
++
++        Returns:
++            Adam optimizer instance
++
++        """
++        return torch.optim.Adam(self.model.parameters(), lr=1e-5)
+diff --git a/src/predictor/llm_model.py b/src/predictor/llm_model.py
+new file mode 100644
+index 0000000..5a87484
+--- /dev/null
++++ b/src/predictor/llm_model.py
+@@ -0,0 +1,352 @@
++from __future__ import annotations
++
++import json
++import logging
++import re
++from datetime import datetime
++from typing import Any, NotRequired, TypedDict
++
++import aiohttp
++from fastapi import FastAPI, HTTPException
++from pydantic import BaseModel, Field
++
++from configs.model_config import ModelConfig
++
++config = ModelConfig()
++config.LOG_DIR.mkdir(parents=True, exist_ok=True)
++
++logging.basicConfig(
++    level=logging.DEBUG if config.LOG_LEVEL == "DEBUG" else logging.INFO,
++    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
++    datefmt="%Y-%m-%d %H:%M:%S",
++    handlers=[
++        logging.FileHandler(
++            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
++            mode="a",
++        ),
++        logging.StreamHandler(),
++    ],
++)
++
++logger = logging.getLogger(__name__)
++app = FastAPI()
++
++
++class ClassificationResponse(BaseModel):
++    """Structured response from the classification model."""
++
++    class_label: str = Field(..., description="Predicted document class")
++    confidence: float = Field(..., description="Prediction confidence score")
++
++
++class OllamaOptions(TypedDict):
++    """Type definition for Ollama API options."""
++
++    temperature: float
++    top_p: float
++    frequency_penalty: float
++    presence_penalty: float
++    num_ctx: int
++    num_gpu: int
++    num_thread: int
++
++
++class OllamaRequest(TypedDict, total=False):
++    """Type definition for Ollama API request."""
++
++    model: str  # required
++    prompt: str  # required
++    format: NotRequired[str]
++    options: NotRequired[OllamaOptions]
++    system: NotRequired[str]
++    stream: NotRequired[bool]
++    raw: NotRequired[bool]
++    keep_alive: NotRequired[str | int]
++
++
++class LLMModelWrapper:
++    """Document classification using direct Ollama integration."""
++
++    CLASSIFICATION_SYSTEM_PROMPT = """You are a document classification expert tasked with precise analysis.
++    Core Requirements:
++    1. Analyze text provided in {language}
++    2. Classify into categories: {categories}
++    3. Output JSON format: {{"class_label": "category", "confidence": number}}
++
++    Guidelines:
++    - Evaluate based on content, style, terminology and format
++    - Look for distinctive markers and key phrases
++    - Consider document structure and formatting patterns
++    - Maintain consistent standards across documents
++    - Use confidence scores that realistically reflect certainty
++    - Confidence range: 0-100
++    - Return clean JSON only, no other text"""
++
++    CLASSIFICATION_PROMPT = """Task Analysis:
++    You are examining a document in {language} to determine its category from: {categories}
++
++    Document Classification Guidelines:
++    1. Analyze these key aspects:
++        - Subject matter and main themes
++        - Technical terminology usage
++        - Writing style and tone
++        - Document structure and sections
++        - Target audience indicators
++        - Domain-specific formatting
++
++    2. Evidence Collection:
++        - Identify definitive category markers
++        - Note absence of expected features
++        - Compare against typical examples
++        - Check for mixed/ambiguous signals
++        - Evaluate consistency throughout
++
++    3. Confidence Scoring:
++        - 90-100: Unambiguous match with strong indicators
++        - 70-89: Clear match with some uncertainty
++        - 50-69: Probable match with mixed signals
++        - Below 50: Significant uncertainty
++
++    Input Document:
++    {text}
++
++    Required Response Format:
++    - Pure JSON object
++    - Must include class_label and confidence
++    - Example: {{"class_label": "example_category", "confidence": 85}}
++    - No explanatory text outside JSON
++
++    Respond with classification:"""
++
++    def __init__(self, config: ModelConfig) -> None:
++        """Initialize classifier with configuration."""
++        self.config = config
++        self.base_url = f"{config.OLLAMA_BASE_URL}/api/generate"
++
++    def _prepare_request(
++        self,
++        text: str,
++        language: str,
++    ) -> OllamaRequest:
++        """Prepare the request payload for Ollama API."""
++        system_prompt = self.CLASSIFICATION_SYSTEM_PROMPT.format(
++            language=language,
++            categories=self.config.DOCUMENT_CLASSES,
++        )
++
++        user_prompt = self.CLASSIFICATION_PROMPT.format(
++            text=text,
++            language=language,
++            categories=self.config.DOCUMENT_CLASSES,
++        )
++
++        return {
++            "model": self.config.MODEL_NAME,
++            "prompt": user_prompt,
++            "system": system_prompt,
++            "format": "json",
++            "stream": False,
++            "options": {
++                "temperature": self.config.TEMPERATURE,
++                "top_p": self.config.TOP_P,
++                "frequency_penalty": self.config.FREQUENCY_PENALTY,
++                "presence_penalty": self.config.PRESENCE_PENALTY,
++                "num_ctx": self.config.NUM_CTX,
++                "num_gpu": self.config.NUM_GPU,
++                "num_thread": self.config.NUM_THREAD,
++            },
++            "keep_alive": "15m",
++        }
++
++    def _process_raw_response(self, content: str) -> ClassificationResponse:
++        """Process raw response when JSON parsing fails.
++
++        Args:
++            content: Raw response content from the model
++
++        Returns:
++            Structured classification response
++
++        Raises:
++            ValueError: If unable to extract valid classification
++
++        """
++        # Remove any potential markdown code blocks
++        content = re.sub(r"```json\s*|\s*```", "", content)
++
++        # Try to find class and confidence using regex
++        class_match = re.search(
++            r"class_label[\"']?\s*:\s*[\"']([^\"']+)[\"']",
++            content,
++        )
++        conf_match = re.search(
++            r"confidence[\"']?\s*:\s*(0?\.\d+|1\.0?|1|0)",
++            content,
++        )
++
++        if not (class_match and conf_match):
++            raise ValueError(
++                "Unable to extract valid classification from response",
++            )
++
++        class_label = class_match.group(1)
++        confidence = float(conf_match.group(1))
++
++        if class_label not in self.config.DOCUMENT_CLASSES:
++            raise ValueError(f"Invalid class label: {class_label}")
++
++        if not 0 <= confidence <= 100:
++            logger.warning(
++                "Invalid confidence score: %s, calculating...",
++                confidence,
++            )
++            confidence = min(100, confidence)
++
++        return ClassificationResponse(
++            class_label=class_label,
++            confidence=confidence,
++        )
++
++    def _validate_classification_response(
++        self,
++        response_data: dict[str, Any],
++    ) -> ClassificationResponse:
++        """Validate and process the classification response.
++
++        Args:
++            response_data: Parsed JSON response
++
++        Returns:
++            Validated classification response
++
++        Raises:
++            ValueError: If response doesn't meet requirements
++
++        """
++        if not isinstance(response_data, dict):
++            raise ValueError("Response must be a JSON object")
++
++        if (
++            "class_label" not in response_data
++            or "confidence" not in response_data
++        ):
++            raise ValueError(
++                'Response must contain "class_label" and "confidence" fields',
++            )
++
++        class_label = response_data["class_label"]
++        confidence = response_data["confidence"]
++
++        if not isinstance(class_label, str) or not isinstance(
++            confidence,
++            (int, float),
++        ):
++            raise ValueError("Invalid field types in response")
++
++        if class_label not in self.config.DOCUMENT_CLASSES:
++            raise ValueError(f"Invalid class label: {class_label}")
++
++        if not 0 <= confidence <= 100:
++            logger.warning(
++                "Invalid confidence score: %s, calculating...",
++                confidence,
++            )
++            confidence = min(100, confidence)
++
++        return ClassificationResponse(
++            class_label=class_label,
++            confidence=float(confidence),
++        )
++
++    async def predict_class(
++        self,
++        text: str,
++        language: str,
++    ) -> str:
++        """Predict document class using the LLM model.
++
++        Args:
++            text: Document text to classify
++            language: Language of the document
++
++        Returns:
++            Predicted document class in format "class_label|confidence"
++
++        Raises:
++            HTTPException: If classification fails
++
++        """
++
++        def _raise_invalid_response():
++            msg = "Invalid response format from Ollama"
++            raise ValueError(msg)
++
++        def _raise_empty_response():
++            msg = "Empty response from Ollama"
++            raise ValueError(msg)
++
++        try:
++            request_data = self._prepare_request(text, language)
++
++            timeout = aiohttp.ClientTimeout(total=300)
++            async with (
++                aiohttp.ClientSession(timeout=timeout) as session,
++                session.post(
++                    self.base_url,
++                    json=request_data,
++                ) as response,
++            ):
++                response.raise_for_status()
++                result = await response.json()
++
++                if not isinstance(result, dict) or "response" not in result:
++                    _raise_invalid_response()
++
++                content = result["response"].strip()
++                if not content:
++                    _raise_empty_response()
++
++                try:
++                    # Try to parse as JSON first
++                    response_data = json.loads(content)
++                    classification = self._validate_classification_response(
++                        response_data,
++                    )
++                except (json.JSONDecodeError, ValueError) as e:
++                    logger.warning(
++                        "Failed to parse JSON response, falling back to raw "
++                        "processing: %s",
++                        str(e),
++                    )
++                    # Fall back to raw response processing
++                    classification = self._process_raw_response(content)
++
++                # Return in the expected format "class_label|confidence"
++                return (
++                    f"{classification.class_label}|{classification.confidence}"
++                )
++
++        except aiohttp.ClientError as e:
++            logger.exception("Ollama API communication error")
++            raise HTTPException(
++                status_code=500,
++                detail=f"Failed to communicate with Ollama: {e!s}",
++            ) from e
++
++        except ValueError as e:
++            logger.exception("Invalid response format from Ollama")
++            raise HTTPException(
++                status_code=500,
++                detail=str(e),
++            ) from e
++
++        except Exception as e:
++            logger.exception("Classification failed")
++            raise HTTPException(
++                status_code=500,
++                detail=f"Classification failed: {e!s}",
++            ) from e
++
++
++# Create model instance
++llm_model = LLMModelWrapper(config)
+diff --git a/src/predictor/model.py b/src/predictor/model.py
+deleted file mode 100644
+index 20c69a3..0000000
+--- a/src/predictor/model.py
++++ /dev/null
+@@ -1,264 +0,0 @@
+-import logging
+-from datetime import datetime
+-from typing import Any, AsyncGenerator
+-
+-import lightning.pytorch as pl
+-import requests
+-import torch
+-import torch.nn.functional as F
+-from fastapi import Depends, FastAPI, HTTPException
+-from torchmetrics import Accuracy
+-from transformers import LayoutLMv3ForSequenceClassification, PreTrainedModel
+-
+-from configs.model_config import ModelConfig
+-from database import DocumentError, DocumentRepository, get_repository
+-from payload.model_models import PagePrediction, ProcessorResult
+-
+-config = ModelConfig()
+-config.LOG_DIR.mkdir(parents=True, exist_ok=True)
+-
+-logging.basicConfig(
+-    level=logging.DEBUG if config.LOG_LEVEL == "DEBUG" else logging.INFO,
+-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+-    datefmt="%Y-%m-%d %H:%M:%S",
+-    handlers=[
+-        logging.FileHandler(
+-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
+-        ),
+-        logging.StreamHandler(),
+-    ],
+-)
+-
+-logger = logging.getLogger(__name__)
+-
+-app = FastAPI()
+-
+-
+-class ModelModule(pl.LightningModule):
+-    def __init__(self, n_classes: int = 15):
+-        super().__init__()
+-        self.model = LayoutLMv3ForSequenceClassification.from_pretrained(
+-            "/app/data/models/layoutlmv3-base-finetuned-rvlcdip",
+-            num_labels=n_classes,
+-            use_safetensors=True,
+-        )
+-        self.model.config.id2label = {
+-            k: v for k, v in enumerate(config.DOCUMENT_CLASSES)
+-        }
+-        self.model.config.label2id = {
+-            v: k for k, v in enumerate(config.DOCUMENT_CLASSES)
+-        }
+-        self.train_accuracy = Accuracy(task="multiclass", num_classes=n_classes)
+-        self.val_accuracy = Accuracy(task="multiclass", num_classes=n_classes)
+-
+-    def forward(self, input_ids, attention_mask, bbox, pixel_values):
+-        return self.model(
+-            input_ids,
+-            attention_mask=attention_mask,
+-            bbox=bbox,
+-            pixel_values=pixel_values,
+-        )
+-
+-    def training_step(self, batch, batch_idx):
+-        input_ids = batch["input_ids"]
+-        attention_mask = batch["attention_mask"]
+-        bbox = batch["bbox"]
+-        pixel_values = batch["pixel_values"]
+-        labels = batch["labels"]
+-
+-        output = self(input_ids, attention_mask, bbox, pixel_values, labels)
+-
+-        self.log("train_loss", output.loss)
+-        self.log(
+-            "train_acc",
+-            self.train_accuracy(output.logits, labels),
+-            on_step=True,
+-            on_epoch=True,
+-        )
+-
+-        return output.loss
+-
+-    def validation_step(self, batch, batch_idx):
+-        input_ids = batch["input_ids"]
+-        attention_mask = batch["attention_mask"]
+-        bbox = batch["bbox"]
+-        pixel_values = batch["pixel_values"]
+-        labels = batch["labels"]
+-
+-        output = self(input_ids, attention_mask, bbox, pixel_values, labels)
+-
+-        self.log("val_loss", output.loss)
+-        self.log(
+-            "val_acc",
+-            self.val_accuracy(output.logits, labels),
+-            on_step=False,
+-            on_epoch=True,
+-        )
+-
+-        return output.loss
+-
+-    def configure_optimizers(self):
+-        optimizer = torch.optim.Adam(self.model.parameters(), lr=1e-5)
+-        return optimizer
+-
+-
+-model = ModelModule(n_classes=len(config.DOCUMENT_CLASSES))
+-model.eval()
+-
+-
+-def _calculate_page_weights(page_predictions: list[PagePrediction]) -> torch.Tensor:
+-    """Calculate weights for each page based on multiple factors.
+-
+-    Args:
+-        page_predictions: List of predictions for each page
+-
+-    Returns:
+-        Tensor of normalized weights for each page
+-    """
+-    text_lengths = torch.tensor([pred.text_length for pred in page_predictions])
+-    confidences = torch.tensor([pred.confidence for pred in page_predictions])
+-
+-    if text_lengths.max() > 0:
+-        normalized_lengths = text_lengths / text_lengths.max()
+-    else:
+-        normalized_lengths = torch.ones_like(text_lengths)
+-
+-    weights = (normalized_lengths * confidences) + 1e-6
+-
+-    for i, (raw_weight, length, conf) in enumerate(
+-        zip(weights, text_lengths, confidences)
+-    ):
+-        logger.debug(
+-            f"Page {i+1} pre-normalization: "
+-            f"weight={raw_weight:.4f}, "
+-            f"text_length={length}, "
+-            f"confidence={conf:.4f}"
+-        )
+-
+-    temperature = 1.0
+-    normalized_weights = F.softmax(weights / temperature, dim=0)
+-
+-    for i, weight in enumerate(normalized_weights):
+-        logger.debug(f"Page {i+1} final weight: {weight:.4f}")
+-
+-    return normalized_weights
+-
+-
+-def aggregate_predictions(
+-    model: PreTrainedModel, page_predictions: list[PagePrediction]
+-) -> dict[str, Any]:
+-    """Aggregate predictions from multiple pages using weighted voting.
+-
+-    Args:
+-        page_predictions: List of predictions for each page
+-
+-    Returns:
+-        Dictionary containing final classification results
+-    """
+-    if not page_predictions:
+-        raise ValueError("No valid predictions to aggregate")
+-
+-    weights = _calculate_page_weights(page_predictions)
+-
+-    stacked_logits = torch.stack([pred.logits for pred in page_predictions])
+-    weighted_logits = (stacked_logits * weights.unsqueeze(-1)).sum(dim=0)
+-
+-    probabilities = F.softmax(weighted_logits, dim=-1)
+-    confidence, predicted_class = torch.max(probabilities, dim=-1)
+-
+-    return {
+-        "predicted_class": model.config.id2label[predicted_class.item()],
+-        "confidence": confidence.item(),
+-        "page_predictions": [
+-            {
+-                "page": pred.page_number,
+-                "class": pred.predicted_class,
+-                "confidence": pred.confidence,
+-                "weight": weight.item(),
+-            }
+-            for pred, weight in zip(page_predictions, weights)
+-        ],
+-        "probability_distribution": {
+-            model.config.id2label[i]: prob.item()
+-            for i, prob in enumerate(probabilities)
+-        },
+-    }
+-
+-
+-@app.post("/predict-class")
+-async def predict(
+-    data: ProcessorResult,
+-    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
+-) -> dict[str, str]:
+-    """
+-    Predict document class from processed data.
+-
+-    Args:
+-        data: Processed data from document processor
+-        repository: Document repository instance
+-    """
+-
+-    try:
+-        logger.info("Received data for prediction")
+-        input_ids = torch.tensor(data.input_ids)
+-        attention_mask = torch.tensor(data.attention_mask)
+-        bbox = torch.tensor(data.bbox)
+-        pixel_values = torch.tensor(data.pixel_values)
+-
+-        with torch.inference_mode():
+-            output = model(input_ids, attention_mask, bbox, pixel_values)
+-
+-        probabilities = F.softmax(output.logits, dim=-1)
+-        confidence, predicted_class = torch.max(probabilities, dim=-1)
+-
+-        predictions = []
+-        for i in range(output.logits.size(0)):
+-            pred_class = predicted_class[i].item()
+-            conf = confidence[i].item()
+-            text_length = torch.sum(attention_mask[i]).item()
+-
+-            predictions.append(
+-                PagePrediction(
+-                    page_number=i,
+-                    logits=output.logits[i],
+-                    confidence=conf,
+-                    predicted_class=model.model.config.id2label[pred_class],
+-                    text_length=text_length,
+-                )
+-            )
+-
+-        detailed_results = aggregate_predictions(model.model, predictions)
+-
+-        logger.debug("Prediction results: %s", detailed_results)
+-        logger.info("Predicted class: %s", detailed_results["predicted_class"])
+-
+-        try:
+-            await repository.update_classification(
+-                data.file_name,
+-                detailed_results["predicted_class"],
+-            )
+-        except DocumentError as e:
+-            logger.error("Failed to update classification: %s", str(e))
+-            raise HTTPException(
+-                status_code=500,
+-                detail="Failed to update classification",
+-            ) from e
+-
+-        response = requests.post(
+-            config.SUMMARIZER_URL,
+-            json={
+-                "file_name": data.file_name,
+-                "text": data.text,
+-                "classification": detailed_results["predicted_class"],
+-            },
+-            timeout=300,
+-        )
+-
+-        return response.json()
+-
+-    except Exception as e:
+-        logger.exception("Prediction failed")
+-        raise HTTPException(
+-            status_code=500,
+-            detail=str(e),
+-        ) from e
+diff --git a/src/predictor/predictor.py b/src/predictor/predictor.py
+new file mode 100644
+index 0000000..4612836
+--- /dev/null
++++ b/src/predictor/predictor.py
+@@ -0,0 +1,271 @@
++import logging
++from collections.abc import AsyncGenerator
++from datetime import datetime
++from typing import Any
++
++import aiohttp
++import torch
++import torch.nn.functional as f
++from fastapi import Depends, FastAPI, HTTPException
++from layoutlm_wrapper import LayoutLMV3Wrapper
++from lingua import Language
++from llm_model import LLMModelWrapper
++from transformers import PreTrainedModel
++
++from configs.model_config import ModelConfig
++from database import DocumentError, DocumentRepository, get_repository
++from payload.predictor_models import PagePrediction
++from payload.shared_models import ProcessorResult
++
++config = ModelConfig()
++config.LOG_DIR.mkdir(parents=True, exist_ok=True)
++
++logging.basicConfig(
++    level=logging.DEBUG if config.LOG_LEVEL == "DEBUG" else logging.INFO,
++    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
++    datefmt="%Y-%m-%d %H:%M:%S",
++    handlers=[
++        logging.FileHandler(
++            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
++            mode="a",
++        ),
++        logging.StreamHandler(),
++    ],
++)
++
++
++logger = logging.getLogger(__name__)
++
++app = FastAPI()
++
++
++layoutlm_model = LayoutLMV3Wrapper(config)
++layoutlm_model.eval()
++
++llm_model = LLMModelWrapper(config)
++
++
++def _calculate_page_weights(
++    page_predictions: list[PagePrediction],
++) -> torch.Tensor:
++    """Calculate weights for each page based on multiple factors.
++
++    Args:
++        page_predictions: List of predictions for each page
++
++    Returns:
++        Tensor of normalized weights for each page
++
++    """
++    text_lengths = torch.tensor([pred.text_length for pred in page_predictions])
++    confidences = torch.tensor([pred.confidence for pred in page_predictions])
++
++    if text_lengths.max() > 0:
++        normalized_lengths = text_lengths / text_lengths.max()
++    else:
++        normalized_lengths = torch.ones_like(text_lengths)
++
++    weights = (normalized_lengths * confidences) + 1e-6
++
++    for i, (raw_weight, length, conf) in enumerate(
++        zip(weights, text_lengths, confidences),
++    ):
++        logger.debug(
++            "Page %(page)d pre-normalization: weight=%(weight).4f, text_length=%(length)d, confidence=%(conf).4f",
++            {
++                "page": i + 1,
++                "weight": raw_weight,
++                "length": length,
++                "conf": conf,
++            },
++        )
++
++    temperature = 1.0
++    normalized_weights = f.softmax(weights / temperature, dim=0)
++
++    for i, weight in enumerate(normalized_weights):
++        logger.debug(
++            "Page %(page)d final weight: %(weight).4f",
++            {"page": i + 1, "weight": weight},
++        )
++
++    return normalized_weights
++
++
++def aggregate_predictions(
++    model: PreTrainedModel,
++    page_predictions: list[PagePrediction],
++) -> dict[str, Any]:
++    """Aggregate predictions from multiple pages using weighted voting.
++
++    Args:
++        model: Pre-trained model containing label mapping configuration
++        page_predictions: List of predictions for each page
++
++    Returns:
++        Dictionary containing final classification results
++
++    """
++    if not page_predictions:
++        msg = "No valid predictions to aggregate"
++        raise ValueError(msg)
++
++    weights = _calculate_page_weights(page_predictions)
++
++    stacked_logits = torch.stack([pred.logits for pred in page_predictions])
++    weighted_logits = (stacked_logits * weights.unsqueeze(-1)).sum(dim=0)
++
++    probabilities = f.softmax(weighted_logits, dim=-1)
++    confidence, predicted_class = torch.max(probabilities, dim=-1)
++
++    return {
++        "predicted_class": model.config.id2label[int(predicted_class.item())],
++        "confidence": confidence.item(),
++        "page_predictions": [
++            {
++                "page": pred.page_number,
++                "class": pred.predicted_class,
++                "confidence": pred.confidence,
++                "weight": weight.item(),
++            }
++            for pred, weight in zip(page_predictions, weights)
++        ],
++        "probability_distribution": {
++            model.config.id2label[i]: prob.item()
++            for i, prob in enumerate(probabilities)
++        },
++    }
++
++
++@app.post("/predict-class")
++async def predict(
++    data: ProcessorResult,
++    repository: AsyncGenerator[DocumentRepository, None] = Depends(
++        get_repository,
++    ),
++) -> dict[str, str]:
++    """Predict document class from processed data.
++
++    Args:
++        data: Processed data from document processor
++        repository: Document repository instance
++
++    Returns:
++        Dictionary containing prediction results and summary
++
++    """
++    try:
++        logger.info("Received data for prediction")
++
++        # Initialize variables for prediction results
++        detailed_results = None
++
++        # Choose prediction method based on language
++        if getattr(Language, data.language) != Language.ENGLISH:
++            # Use LLM for non-English documents
++            logger.info("Using LLM model for non-English document")
++            prediction_result = await llm_model.predict_class(
++                data.text,
++                data.language,
++            )
++            logger.debug("LLM prediction result: %s", prediction_result)
++            # Parse the LLM output (format: "class_label|confidence_score")
++            predicted_class, confidence = prediction_result.split("|")
++            confidence = float(confidence) / 100
++
++            detailed_results = {
++                "predicted_class": predicted_class,
++                "confidence": confidence,
++                "page_predictions": [
++                    {
++                        "page": 0,
++                        "class": predicted_class,
++                        "confidence": confidence,
++                        "weight": 1.0,
++                    },
++                ],
++                "probability_distribution": {
++                    predicted_class: confidence,
++                },
++            }
++        else:
++            # Use LayoutLM for English documents
++            logger.info("Using LayoutLM model for English document")
++            input_ids = torch.tensor(data.input_ids)
++            attention_mask = torch.tensor(data.attention_mask)
++            bbox = torch.tensor(data.bbox)
++            pixel_values = torch.tensor(data.pixel_values)
++
++            with torch.inference_mode():
++                output = layoutlm_model(
++                    input_ids,
++                    attention_mask,
++                    bbox,
++                    pixel_values,
++                )
++
++            probabilities = f.softmax(output.logits, dim=-1)
++            confidence, predicted_class = torch.max(probabilities, dim=-1)
++
++            predictions = []
++            for i in range(output.logits.size(0)):
++                pred_class = int(predicted_class[i].item())
++                conf = confidence[i].item()
++                text_length = int(torch.sum(attention_mask[i]).item())
++
++                predictions.append(
++                    PagePrediction(
++                        page_number=i,
++                        logits=output.logits[i],
++                        confidence=conf,
++                        predicted_class=layoutlm_model.model.config.id2label[
++                            pred_class
++                        ],
++                        text_length=text_length,
++                    ),
++                )
++
++            detailed_results = aggregate_predictions(
++                layoutlm_model.model,
++                predictions,
++            )
++
++        logger.debug("Prediction results: %s", detailed_results)
++        logger.info("Predicted class: %s", detailed_results["predicted_class"])
++
++        # Update classification in repository
++        try:
++            await repository.update_classification(
++                data.file_name,
++                detailed_results["predicted_class"],
++            )
++        except DocumentError as e:
++            logger.exception("Failed to update classification")
++            raise HTTPException(
++                status_code=500,
++                detail="Failed to update classification",
++            ) from e
++
++        # Send to summarizer
++        timeout = aiohttp.ClientTimeout(total=480)
++        async with (
++            aiohttp.ClientSession() as session,
++            session.post(
++                config.SUMMARIZER_URL,
++                json={
++                    "file_name": data.file_name,
++                    "text": data.text,
++                    "classification": detailed_results["predicted_class"],
++                },
++                timeout=timeout,
++            ) as response,
++        ):
++            response.raise_for_status()
++            return await response.json()
++
++    except Exception as e:
++        logger.exception("Prediction failed")
++        raise HTTPException(
++            status_code=500,
++            detail=str(e),
++        ) from e
+diff --git a/src/processor/dataset.py b/src/processor/dataset.py
+index 423599a..41ec4ac 100644
+--- a/src/processor/dataset.py
++++ b/src/processor/dataset.py
+@@ -1,16 +1,22 @@
++from __future__ import annotations
++
+ import base64
+ import io
+ import logging
+ from datetime import datetime
+-from typing import Optional
++from typing import TYPE_CHECKING
+ 
+ import torch
+ from PIL import Image
+ from torch.utils.data import Dataset
+-from transformers import ProcessorMixin
+ 
+ from configs.processor_config import ProcessorConfig
+-from payload.processor_models import OCRResult, ProcessorInput
++
++if TYPE_CHECKING:
++    from transformers import ProcessorMixin
++
++    from payload.processor_models import ProcessorInput
++    from payload.shared_models import OCRResult
+ 
+ config = ProcessorConfig()
+ config.LOG_DIR.mkdir(parents=True, exist_ok=True)
+@@ -21,7 +27,8 @@ logging.basicConfig(
+     datefmt="%Y-%m-%d %H:%M:%S",
+     handlers=[
+         logging.FileHandler(
+-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
++            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
++            mode="a",
+         ),
+         logging.StreamHandler(),
+     ],
+@@ -38,24 +45,27 @@ class DocumentClassificationDataset(Dataset):
+         processor: ProcessorMixin,
+         data: ProcessorInput,
+         config: ProcessorConfig,
+-        labels: Optional[list[int]] = None,
++        labels: list[int] | None = None,
+         *,
+-        encodings: Optional[dict[str, torch.Tensor]] = None,
++        encodings: dict[str, torch.Tensor] | None = None,
+     ) -> None:
+-        """
+-        Initialize document classification dataset.
++        """Initialize document classification dataset.
+ 
+         Args:
+             processor: LayoutLMv3 processor instance
+             data: Validated input data
+             config: Processing configuration
+             labels: Optional classification labels
++            encodings: Pre-computed encodings (optional)
++
+         """
+         self.processor = processor
+         self.config = config
+         self.labels = labels
+         self.encodings = (
+-            encodings if encodings is not None else self._prepare_encodings(data)
++            encodings
++            if encodings is not None
++            else self._prepare_encodings(data)
+         )
+ 
+     @classmethod
+@@ -65,8 +75,7 @@ class DocumentClassificationDataset(Dataset):
+         data: ProcessorInput,
+         config: ProcessorConfig,
+     ) -> dict[str, torch.Tensor]:
+-        """
+-        Get document encodings without instantiating the full dataset.
++        """Get document encodings without instantiating the full dataset.
+ 
+         This method processes the input data and returns only the encodings,
+         which is useful when you don't need the full dataset functionality.
+@@ -81,6 +90,7 @@ class DocumentClassificationDataset(Dataset):
+ 
+         Raises:
+             ValueError: If encoding preparation fails
++
+         """
+         temp_instance = cls(
+             processor=processor,
+@@ -89,23 +99,36 @@ class DocumentClassificationDataset(Dataset):
+             encodings={},
+         )
+ 
+-        return temp_instance._prepare_encodings(data)
++        return temp_instance.prepare_encodings(data)
++
++    def _check_images(self, images: list[Image.Image]) -> None:
++        """Check if images are valid."""
++        if not images:
++            error_msg = "No valid images found in input data"
++            raise ValueError(error_msg)
+ 
+-    def _prepare_encodings(self, data: ProcessorInput) -> dict[str, torch.Tensor]:
++    def prepare_encodings(
++        self,
++        data: ProcessorInput,
++    ) -> dict[str, torch.Tensor]:
+         """Prepare encodings from input data for multiple pages."""
+         try:
+             images = self._decode_images(data.images)
+-            if not images:
+-                raise ValueError("No valid images found in input data")
++            self._check_images(images)
+ 
+             scales = self._calculate_scales(images[0].size)
+             words_per_page, boxes_per_page = self._prepare_ocr_data(
+-                data.ocr_result, scales
++                data.ocr_result,
++                scales,
+             )
+ 
+             # Process each page separately
+             page_encodings = []
+-            for img, words, boxes in zip(images, words_per_page, boxes_per_page):
++            for img, words, boxes in zip(
++                images,
++                words_per_page,
++                boxes_per_page,
++            ):
+                 encoding = self.processor(
+                     [img],  # Processor expects a list of images
+                     words,
+@@ -120,14 +143,20 @@ class DocumentClassificationDataset(Dataset):
+             # Combine encodings from all pages
+             combined_encodings = {
+                 "input_ids": torch.cat(
+-                    [enc["input_ids"] for enc in page_encodings], dim=0
++                    [enc["input_ids"] for enc in page_encodings],
++                    dim=0,
+                 ),
+                 "attention_mask": torch.cat(
+-                    [enc["attention_mask"] for enc in page_encodings], dim=0
++                    [enc["attention_mask"] for enc in page_encodings],
++                    dim=0,
++                ),
++                "bbox": torch.cat(
++                    [enc["bbox"] for enc in page_encodings],
++                    dim=0,
+                 ),
+-                "bbox": torch.cat([enc["bbox"] for enc in page_encodings], dim=0),
+                 "pixel_values": torch.cat(
+-                    [enc["pixel_values"] for enc in page_encodings], dim=0
++                    [enc["pixel_values"] for enc in page_encodings],
++                    dim=0,
+                 ),
+             }
+ 
+@@ -136,11 +165,12 @@ class DocumentClassificationDataset(Dataset):
+                 {k: v.shape for k, v in combined_encodings.items()},
+             )
+ 
+-            return combined_encodings
+-
+         except Exception as e:
++            error_msg = f"Encoding preparation failed: {e!s}"
+             logger.exception("Error preparing encodings")
+-            raise ValueError(f"Encoding preparation failed: {str(e)}") from e
++            raise ValueError(error_msg) from e
++        else:
++            return combined_encodings
+ 
+     @staticmethod
+     def _decode_images(encoded_images: list[str]) -> list[Image.Image]:
+@@ -150,7 +180,10 @@ class DocumentClassificationDataset(Dataset):
+             for img in encoded_images
+         ]
+ 
+-    def _calculate_scales(self, image_size: tuple[int, int]) -> tuple[float, float]:
++    def _calculate_scales(
++        self,
++        image_size: tuple[int, int],
++    ) -> tuple[float, float]:
+         """Calculate scaling factors for image resizing."""
+         width, height = image_size
+         logger.debug("Image size: %s", image_size)
+@@ -162,7 +195,8 @@ class DocumentClassificationDataset(Dataset):
+ 
+     @staticmethod
+     def _prepare_ocr_data(
+-        ocr_results: list[list[OCRResult]], scales: tuple[float, float]
++        ocr_results: list[list[OCRResult]],
++        scales: tuple[float, float],
+     ) -> tuple[list[str], list[list[int]]]:
+         """Prepare OCR data with scaling."""
+         if not ocr_results:
+@@ -179,7 +213,8 @@ class DocumentClassificationDataset(Dataset):
+                 scaled_box = [
+                     int(coord * scale)
+                     for coord, scale in zip(
+-                        result.bounding_box, [width_scale, height_scale] * 2
++                        result.bounding_box,
++                        [width_scale, height_scale] * 2,
+                     )
+                 ]
+                 tmp_box.append(scaled_box)
+diff --git a/src/processor/processor.py b/src/processor/processor.py
+index 184974a..d2c4d57 100644
+--- a/src/processor/processor.py
++++ b/src/processor/processor.py
+@@ -2,9 +2,10 @@ import logging
+ from datetime import datetime
+ from pathlib import Path
+ 
+-import requests
++import aiohttp
+ from dataset import DocumentClassificationDataset
+ from fastapi import FastAPI, HTTPException
++from lingua import Language, LanguageDetectorBuilder
+ from transformers import (
+     LayoutLMv3ImageProcessor,
+     LayoutLMv3Processor,
+@@ -12,7 +13,7 @@ from transformers import (
+ )
+ 
+ from configs.processor_config import ProcessorConfig
+-from payload.processor_models import ProcessorInput, ProcessorResult
++from payload.processor_models import ProcessorInput, ProcessorOutput
+ 
+ config = ProcessorConfig()
+ # TMP solution to avoid error during testing
+@@ -28,7 +29,8 @@ logging.basicConfig(
+     datefmt="%Y-%m-%d %H:%M:%S",
+     handlers=[
+         logging.FileHandler(
+-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
++            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
++            mode="a",
+         ),
+         logging.StreamHandler(),
+     ],
+@@ -37,6 +39,11 @@ logging.basicConfig(
+ logger = logging.getLogger(__name__)
+ 
+ app = FastAPI()
++detector = (
++    LanguageDetectorBuilder.from_all_languages()
++    .with_preloaded_language_models()
++    .build()
++)
+ 
+ 
+ class DocumentProcessor:
+@@ -46,33 +53,39 @@ class DocumentProcessor:
+         """Initialize document processor."""
+         self.processor = LayoutLMv3Processor(
+             LayoutLMv3ImageProcessor(apply_ocr=False),
+-            LayoutLMv3TokenizerFast.from_pretrained("/app/data/models/layoutlmv3-base"),
++            LayoutLMv3TokenizerFast.from_pretrained(
++                "/app/data/models/layoutlmv3-base",
++            ),
+         )
+ 
+-    def process_document(self, input_data: ProcessorInput) -> ProcessorResult:
+-        """
+-        Process document with LayoutLMv3.
++    def process_document(self, input_data: ProcessorInput) -> ProcessorOutput:
++        """Process document with LayoutLMv3.
+ 
+         Args:
+             input_data: Validated input data containing OCR results and images
++
+         """
+         try:
+-            encodings: list[dict] = DocumentClassificationDataset.get_encodings(
+-                self.processor, input_data, config
++            encodings: dict = DocumentClassificationDataset.get_encodings(
++                self.processor,
++                input_data,
++                config,
+             )
+ 
+-            result = ProcessorResult(
+-                input_ids=encodings["input_ids"],
+-                attention_mask=encodings["attention_mask"],
+-                bbox=encodings["bbox"],
+-                pixel_values=encodings["pixel_values"],
++            result = ProcessorOutput(
++                input_ids=encodings["input_ids"].tolist(),
++                attention_mask=encodings["attention_mask"].tolist(),
++                bbox=encodings["bbox"].tolist(),
++                pixel_values=encodings["pixel_values"].tolist(),
+             )
+ 
+-            return result
+-
+         except Exception as e:
+             logger.exception("Document processing failed")
+-            raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
++            detail = f"Processing failed: {e!s}"
++            raise HTTPException(status_code=500, detail=detail) from e
++
++        else:
++            return result
+ 
+ 
+ # Create processor instance
+@@ -81,35 +94,79 @@ document_processor = DocumentProcessor()
+ 
+ @app.post("/text-preprocess")
+ async def process_text(data: ProcessorInput) -> dict[str, str]:
+-    """
+-    Process document text and layout.
++    """Process document text and layout.
+ 
+     Args:
+         data: Validated input data containing OCR results and images
++
+     """
+     try:
++        text = " ".join(
++            result.word
++            for ocr_result in data.ocr_result
++            for result in ocr_result
++        )
++
++        detected_language = detector.detect_language_of(text)
++
++        if detected_language is None:
++            # Default to English if language detection fails
++            detected_language = Language.ENGLISH
++
++        if detected_language != Language.ENGLISH:
++            timeout = aiohttp.ClientTimeout(total=480)
++            async with (
++                aiohttp.ClientSession() as session,
++                session.post(
++                    config.PREDICT_URL,
++                    json={
++                        "input_ids": None,
++                        "attention_mask": None,
++                        "bbox": None,
++                        "pixel_values": None,
++                        "file_name": data.file_name,
++                        "text": text,
++                        "language": detected_language.name,
++                    },
++                    timeout=timeout,
++                ) as response,
++            ):
++                response.raise_for_status()
++                return await response.json()
++
+         encodings = document_processor.process_document(data)
+ 
+-        encodings = {k: v.tolist() for k, v in encodings.model_dump().items()}
+-
+-        # logger.info(
+-        #     "Text from OCR: %s", " ".join(result.word for result in data.ocr_result[0])
+-        # )
+-
+-        response = requests.post(
+-            config.PREDICT_URL,
+-            json={
+-                "input_ids": encodings["input_ids"],
+-                "attention_mask": encodings["attention_mask"],
+-                "bbox": encodings["bbox"],
+-                "pixel_values": encodings["pixel_values"],
+-                "file_name": data.file_name,
+-                "text": " ".join(result.word for result in data.ocr_result[0]),
+-            },
+-            timeout=300,
++        encodings = encodings.model_dump()
++
++        logger.debug(
++            "Text from OCR: %s",
++            " ".join(
++                result.word
++                for ocr_result in data.ocr_result
++                for result in ocr_result
++            ),
+         )
+-        return response.json()
++
++        timeout = aiohttp.ClientTimeout(total=480)
++        async with (
++            aiohttp.ClientSession() as session,
++            session.post(
++                config.PREDICT_URL,
++                json={
++                    "input_ids": encodings["input_ids"],
++                    "attention_mask": encodings["attention_mask"],
++                    "bbox": encodings["bbox"],
++                    "pixel_values": encodings["pixel_values"],
++                    "file_name": data.file_name,
++                    "text": text,
++                    "language": detected_language.name,
++                },
++                timeout=timeout,
++            ) as response,
++        ):
++            response.raise_for_status()
++            return await response.json()
+ 
+     except Exception as e:
+         logger.exception("Endpoint processing failed")
+-        raise HTTPException(status_code=500, detail=str(e))
++        raise HTTPException(status_code=500, detail=str(e)) from e
+diff --git a/src/summarization/summarizer.py b/src/summarization/summarizer.py
+index f002f03..1a7849b 100644
+--- a/src/summarization/summarizer.py
++++ b/src/summarization/summarizer.py
+@@ -1,18 +1,17 @@
++from __future__ import annotations
++
++import json
+ import logging
++import re
+ from datetime import datetime
+-from typing import AsyncGenerator
++from typing import Any, NotRequired, TypedDict, cast
+ 
++import aiohttp
+ from fastapi import Depends, FastAPI, HTTPException
+-from langchain.prompts import (
+-    ChatPromptTemplate,
+-    HumanMessagePromptTemplate,
+-    SystemMessagePromptTemplate,
+-)
+-from langchain_ollama.chat_models import ChatOllama
+ 
+ from configs.summarization_config import SummarizationConfig
+ from database import DocumentError, DocumentRepository, get_repository
+-from payload.summarizer_models import SummarizationRequest
++from payload.summarizer_models import SummarizationRequest, SummaryResponse
+ 
+ config = SummarizationConfig()
+ config.LOG_DIR.mkdir(parents=True, exist_ok=True)
+@@ -23,70 +22,228 @@ logging.basicConfig(
+     datefmt="%Y-%m-%d %H:%M:%S",
+     handlers=[
+         logging.FileHandler(
+-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
++            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
++            mode="a",
+         ),
+         logging.StreamHandler(),
+     ],
+ )
+ 
+ logger = logging.getLogger(__name__)
+-
+ app = FastAPI()
+ 
+ 
++class OllamaOptions(TypedDict):
++    """Type definition for Ollama API options."""
++
++    temperature: float
++    top_p: float
++    frequency_penalty: float
++    presence_penalty: float
++    num_ctx: int
++    num_gpu: int
++    num_thread: int
++
++
++class OllamaRequest(TypedDict, total=False):
++    """Type definition for Ollama API request."""
++
++    model: str  # required
++    prompt: str  # required
++    format: NotRequired[str]
++    options: NotRequired[OllamaOptions]
++    system: NotRequired[str]
++    stream: NotRequired[bool]
++    raw: NotRequired[bool]
++    keep_alive: NotRequired[str | int]
++
++
+ class Summarizer:
+-    """Text summarization using Ollama and LangChain."""
+-
+-    SUMMARY_SYSTEM_PROMPT = """You are a precise summarization assistant that creates database-friendly summaries. Follow these rules exactly:
+-    1. Output only the summary text, no introductions or extra words
+-    2. Write complete sentences without periods at the end (use spaces between sentences)
+-    3. Stay strictly between {min_length} and {max_length} words
+-    4. Write in a formal tone appropriate for {classification} documents
+-    5. Use clear connecting words between sentences for flow"""
+-
+-    SUMMARY_PROMPT = """<Instructions>
+-    Write a summary of the {classification} text below
+-    The summary must be between {min_length} and {max_length} words
+-    Do not use periods at the end of sentences, only between sentences
+-    Focus on key information relevant to {classification} type
+-    Only output the summary text, nothing else
+-    </Instructions>
+-
+-    <Text>
++    """Text summarization using direct Ollama integration."""
++
++    SUMMARY_SYSTEM_PROMPT = """You are an expert summarization analyst specializing in precise content distillation.
++
++    Core Requirements:
++    1. Process text in target format: {classification}
++    2. Generate summaries between {min_length}-{max_length} words
++    3. Output JSON format: {{"summary": "extracted key points", "word_count": number}}
++
++    Technical Guidelines:
++    - Create self-contained, complete thought units
++    - Use professional language suited to {classification} context
++    - Employ clear transition phrases between ideas
++    - Maintain consistent technical depth throughout
++    - Structure content with logical progression
++    - Focus on essential information density
++    - Return only valid JSON output"""
++
++    SUMMARY_PROMPT = """Document Analysis Parameters:
++    - Document Type: {classification}
++    - Length Constraints: {min_length} to {max_length} words
++    - Output Format: {{"summary": "content", "word_count": number}}
++
++    Summarization Guidelines:
++    1. Content Analysis:
++        - Identify core themes and key arguments
++        - Extract essential supporting evidence
++        - Preserve critical technical details
++        - Maintain original document tone
++        - Focus on {classification}-specific elements
++
++    2. Summary Construction:
++        - Begin with main thesis/findings
++        - Include critical methodology details
++        - Preserve key statistical data
++        - Connect ideas with clear transitions
++        - End with significant conclusions
++
++    3. Technical Requirements:
++        - Write complete semantic units
++        - Use precise technical terminology
++        - Maintain formal language register
++        - Apply consistent formatting
++        - Generate database-compatible output
++
++    Source Document:
+     {text}
+-    </Text>
+-
+-    <OutputRules>
+-    - Only output the summary
+-    - No introduction or meta text
+-    - No periods at end of sentences
+-    - Must be {min_length}-{max_length} words
+-    </OutputRules>
+-
+-    Summary:"""
+-
+-    def __init__(self):
+-        """Initialize summarizer with Ollama model."""
+-        self.llm = ChatOllama(
+-            model=config.MODEL_NAME,
+-            temperature=config.TEMPERATURE,
+-            top_p=config.TOP_P,
+-            base_url=config.OLLAMA_BASE_URL,
+-            frequency_penalty=config.FREQUENCY_PENALTY,
+-            presence_penalty=config.PRESENCE_PENALTY,
+-            num_ctx=config.NUM_CTX,
+-            num_gpu=config.NUM_GPU,
+-            num_thread=config.NUM_THREAD,
++
++    Response Specifications:
++    - Pure JSON structure
++    - Contains summary and word_count
++    - Meets length requirements
++    - No explanatory text
++    - No terminal periods except between thoughts
++    - Do not use points or bullet lists
++
++    Generate summary:"""
++
++    def __init__(self, config: SummarizationConfig) -> None:
++        """Initialize summarizer with configuration."""
++        self.config = config
++        self.base_url = f"{config.OLLAMA_BASE_URL}/api/generate"
++
++    def _prepare_request(
++        self,
++        text: str,
++        min_length: int,
++        max_length: int,
++        classification: str,
++    ) -> OllamaRequest:
++        """Prepare the request payload for Ollama API."""
++        system_prompt = self.SUMMARY_SYSTEM_PROMPT.format(
++            min_length=min_length,
++            max_length=max_length,
++            classification=classification,
++        )
++
++        user_prompt = self.SUMMARY_PROMPT.format(
++            text=text,
++            min_length=min_length,
++            max_length=max_length,
++            classification=classification,
+         )
+ 
+-        self.prompt = ChatPromptTemplate.from_messages(
+-            [
+-                SystemMessagePromptTemplate.from_template(self.SUMMARY_SYSTEM_PROMPT),
+-                HumanMessagePromptTemplate.from_template(self.SUMMARY_PROMPT),
+-            ]
++        return {
++            "model": self.config.MODEL_NAME,
++            "prompt": user_prompt,
++            "system": system_prompt,
++            "format": "json",
++            "stream": False,
++            "options": {
++                "temperature": self.config.TEMPERATURE,
++                "top_p": self.config.TOP_P,
++                "frequency_penalty": self.config.FREQUENCY_PENALTY,
++                "presence_penalty": self.config.PRESENCE_PENALTY,
++                "num_ctx": self.config.NUM_CTX,
++                "num_gpu": self.config.NUM_GPU,
++                "num_thread": self.config.NUM_THREAD,
++            },
++            "keep_alive": "15m",
++        }
++
++    def _extract_json_from_text(self, text: str) -> dict[str, Any]:
++        """Extract JSON from text that might contain additional content.
++
++        Args:
++            text: Text that might contain JSON
++
++        Returns:
++            Extracted JSON as dict
++
++        Raises:
++            ValueError: If no valid JSON found
++
++        """
++        # Remove any markdown code blocks
++        text = re.sub(r"```json\s*|\s*```", "", text)
++
++        # Try to find JSON pattern
++        json_match = re.search(r"\{.*\}", text, re.DOTALL)
++        if not json_match:
++            raise ValueError("No JSON object found in response")
++
++        try:
++            return cast(dict[str, Any], json.loads(json_match.group()))
++        except json.JSONDecodeError as e:
++            raise ValueError(f"Failed to parse JSON: {e!s}") from e
++
++    def _process_raw_response(self, content: str) -> SummaryResponse:
++        """Process raw response when JSON parsing fails."""
++        # Remove any potential markdown code blocks
++        content = re.sub(r"```json\s*|\s*```", "", content)
++
++        # Try to find content that looks like a summary
++        text = re.sub(r"\s+", " ", content).strip()
++
++        # Count words in the extracted text
++        word_count = len(text.split())
++
++        if not text:
++            raise ValueError("Unable to extract valid summary from response")
++
++        return SummaryResponse(
++            summary=text,
++            word_count=word_count,
+         )
+ 
+-        self.chain = self.prompt | self.llm
++    def _validate_summary_response(
++        self,
++        response_data: dict[str, Any],
++        min_length: int,
++        max_length: int,
++    ) -> SummaryResponse:
++        """Validate and process the summary response."""
++        if not isinstance(response_data, dict):
++            raise ValueError("Response must be a JSON object")
++
++        if "summary" not in response_data or "word_count" not in response_data:
++            raise ValueError(
++                'Response must contain "summary" and "word_count" fields',
++            )
++
++        summary = response_data["summary"]
++        word_count = response_data["word_count"]
++
++        if not isinstance(summary, str) or not isinstance(
++            word_count,
++            (int, float),
++        ):
++            raise ValueError("Invalid field types in response")
++
++        # Convert word_count to int if it's a float
++        word_count = int(word_count)
++
++        actual_word_count = len(summary.split())
++        if actual_word_count < min_length or actual_word_count > max_length:
++            logger.warning(
++                "Summary length (%d words) outside allowed range",
++                actual_word_count,
++            )
++
++        return SummaryResponse(
++            summary=summary,
++            word_count=actual_word_count,
++        )
+ 
+     async def generate_summary(
+         self,
+@@ -95,53 +252,95 @@ class Summarizer:
+         max_length: int = 300,
+         classification: str = "unclassified",
+     ) -> str:
+-        """
+-        Generate a summary of the input text.
++        """Generate a summary of the input text."""
+ 
+-        Args:
+-            text: Input text to summarize
+-            min_length: Minimum summary length in words
+-            max_length: Maximum summary length in words
++        def _validate_ollama_response(result: object) -> None:
++            """Validate Ollama API response format."""
++            error_msg = "Invalid response format from Ollama"
++            if not isinstance(result, dict) or "response" not in result:
++                raise ValueError(error_msg)
++
++        def _validate_content(content: str) -> None:
++            """Validate response content is not empty."""
++            error_msg = "Empty response from Ollama"
++            if not content:
++                raise ValueError(error_msg)
+ 
+-        Returns:
+-            Generated summary text
+-        """
+         try:
+-            response = await self.chain.ainvoke(
+-                {
+-                    "text": text,
+-                    "min_length": min_length,
+-                    "max_length": max_length,
+-                    "classification": classification,
+-                }
++            request_data = self._prepare_request(
++                text,
++                min_length,
++                max_length,
++                classification,
+             )
+-            return response.content.strip().replace(" \n", ". ")
++
++            timeout = aiohttp.ClientTimeout(total=300)
++            async with (
++                aiohttp.ClientSession(timeout=timeout) as session,
++                session.post(self.base_url, json=request_data) as response,
++            ):
++                response.raise_for_status()
++                result = await response.json()
++
++                _validate_ollama_response(result)
++
++                content = result["response"].strip()
++                _validate_content(content)
++
++                logger.debug("Raw response from Ollama: %s", content)
++
++                try:
++                    # Try to extract and parse JSON from response
++                    response_data = self._extract_json_from_text(content)
++                    summary_response = self._validate_summary_response(
++                        response_data,
++                        min_length,
++                        max_length,
++                    )
++                    # Return only the summary text
++                    return summary_response.summary.replace(" \n", ".")
++
++                except (json.JSONDecodeError, ValueError) as e:
++                    logger.warning(
++                        "Failed to parse JSON response, falling back to raw "
++                        "processing: %s",
++                        str(e),
++                    )
++                    # Fall back to raw response processing
++                    summary_response = self._process_raw_response(content)
++                    return summary_response.summary.replace(" \n", ".")
++
++        except aiohttp.ClientError as e:
++            logger.exception("Ollama API communication error")
++            raise HTTPException(
++                status_code=500,
++                detail=f"Failed to communicate with Ollama: {e!s}",
++            ) from e
++
++        except ValueError as e:
++            logger.exception("Invalid response format from Ollama")
++            raise HTTPException(
++                status_code=500,
++                detail=str(e),
++            ) from e
++
+         except Exception as e:
+-            logger.error("Summarization failed: %s", str(e))
++            logger.exception("Summarization failed")
+             raise HTTPException(
+                 status_code=500,
+-                detail="Summarization failed",
+-            )
++                detail=f"Summarization failed: {e!s}",
++            ) from e
+ 
+ 
+-summarizer = Summarizer()
++summarizer = Summarizer(config)
+ 
+ 
+ @app.post("/summarize")
+ async def summarize_document(
+     request: SummarizationRequest,
+-    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
++    repository: DocumentRepository = Depends(get_repository),
+ ) -> dict[str, str]:
+-    """
+-    Generate a summary for the given document.
+-
+-    Args:
+-        request: Summarization request containing text and parameters
+-        repository: Document repository instance
+-
+-    Returns:
+-        Dictionary containing the generated summary
+-    """
++    """Generate a summary for the given document."""
+     try:
+         summary = await summarizer.generate_summary(
+             text=request.text,
+@@ -150,21 +349,25 @@ async def summarize_document(
+             classification=request.classification,
+         )
+ 
+-        # Update document in database with summary
+         try:
+             await repository.update_summary(request.file_name, summary)
+         except DocumentError as e:
+-            logger.error("Failed to update summary: %s", str(e))
++            logger.exception("Failed to update summary")
+             raise HTTPException(
+                 status_code=500,
+                 detail="Failed to save summary",
+-            )
+-
+-        return {"summary": summary, "classification": request.classification}
++            ) from e
+ 
+     except Exception as e:
+         logger.exception("Summarization endpoint failed")
+         raise HTTPException(
+             status_code=500,
+             detail=str(e),
+-        )
++        ) from e
++
++    else:
++        return {
++            "file_name": request.file_name,
++            "summary": summary,
++            "classification": request.classification,
++        }
+diff --git a/src/utils/utils.py b/src/utils/utils.py
+index 730a290..006f69d 100644
+--- a/src/utils/utils.py
++++ b/src/utils/utils.py
+@@ -1,13 +1,16 @@
+-import os
+ import re
+-from typing import AsyncGenerator
++from collections.abc import AsyncGenerator
++from pathlib import Path
++from typing import NoReturn
+ 
+ from database.repository import DocumentRepository
+ 
+ 
+-def make_unique_filename(original_filename: str, existing_filenames: set[str]) -> str:
+-    """
+-    Generate a unique filename by appending a number if the filename already exists.
++def make_unique_filename(
++    original_filename: str,
++    existing_filenames: set[str],
++) -> str:
++    """Generate a unique filename by appending a number if the filename already exists.
+ 
+     Args:
+         original_filename: The original filename to make unique
+@@ -23,12 +26,14 @@ def make_unique_filename(original_filename: str, existing_filenames: set[str]) -
+         'test (2).pdf'
+         >>> make_unique_filename("my file.pdf", {"my file.pdf"})
+         'my file (1).pdf'
++
+     """
+     if original_filename not in existing_filenames:
+         return original_filename
+ 
+-    # Split the filename into name and extension
+-    name, ext = os.path.splitext(original_filename)
++    path = Path(original_filename)
++    name = path.stem
++    ext = path.suffix
+ 
+     # Check if filename already ends with a number in parentheses
+     pattern = r"(.*?)\s*(?:\((\d+)\))?$"
+@@ -52,8 +57,7 @@ async def get_unique_filename(
+     repository: AsyncGenerator[DocumentRepository, None],
+     max_attempts: int = 100,
+ ) -> str:
+-    """
+-    Generate a unique filename that doesn't exist in the database.
++    """Generate a unique filename that doesn't exist in the database.
+ 
+     Args:
+         filename: Original filename to make unique
+@@ -65,7 +69,13 @@ async def get_unique_filename(
+ 
+     Raises:
+         ValueError: If unable to generate unique filename within max_attempts
++
+     """
++    # Create error message once
++    error_message = (
++        "Unable to generate unique filename for {} within {} attempts"
++    )
++
+     try:
+         # Get all existing filenames from database
+         documents = await repository.get_all()
+@@ -77,12 +87,16 @@ async def get_unique_filename(
+         # Verify we didn't exceed max attempts (check the number in parentheses)
+         match = re.search(r"\((\d+)\)", unique_name)
+         if match and int(match.group(1)) > max_attempts:
+-            raise ValueError(
+-                f"Unable to generate unique filename for {filename} "
+-                f"within {max_attempts} attempts"
+-            )
++            # Abstract raise to inner function
++            def raise_max_attempts() -> NoReturn:
++                raise ValueError(error_message.format(filename, max_attempts))
++
++            raise_max_attempts()
+ 
+-        return unique_name
++        else:
++            return unique_name
+ 
+-    except Exception as e:
+-        raise ValueError(f"Error generating unique filename: {str(e)}")
++    except (StopAsyncIteration, AttributeError) as e:
++        # Distinguish exception source
++        error_msg = "Error generating unique filename: {}"
++        raise ValueError(error_msg.format(str(e))) from e

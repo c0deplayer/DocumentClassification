@@ -5,7 +5,7 @@ usage() {
     echo "Usage: $0 [-f|--force] [-d|--detach]  [-p|--password PASSWORD] [-r|--rebuild]"
     echo "Options:"
     echo "  -f, --force      Remove existing models and clone again"
-    echo "  -d, --detach    Run in detached mode"
+    echo "  -d, --detach     Run in detached mode"
     echo "  -p, --password   Set PostgreSQL password"
     echo "  -r, --rebuild    Rebuild docker images"
     echo "  -h, --help       Display this help message"

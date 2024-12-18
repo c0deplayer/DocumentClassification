@@ -1,7 +1,7 @@
 import logging
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import AsyncGenerator
 
 from sqlalchemy import text
 from sqlalchemy.engine import URL
@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import (
 
 from configs.database_config import DatabaseConfig
 
-from .exceptions import ConnectionError
+from .exceptions import ConnectionError as DBConnectionError
 
 config = DatabaseConfig.from_env()
 config.LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -25,7 +25,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.FileHandler(
-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
+            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
+            mode="a",
         ),
         logging.StreamHandler(),
     ],
@@ -37,7 +38,7 @@ logger = logging.getLogger(__name__)
 class DatabaseConnection:
     """Manages database connection and session creation."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize database connection manager."""
         self.engine = self._create_engine()
         self.async_session_maker = async_sessionmaker(
@@ -69,8 +70,9 @@ class DatabaseConnection:
             )
 
         except Exception as e:
-            logger.error("Failed to create database engine: %s", str(e))
-            raise ConnectionError("Failed to establish database connection") from e
+            logger.exception("Failed to create database engine")
+            error_msg = "Failed to establish database connection"
+            raise DBConnectionError(error_msg) from e
 
     async def verify_connection(self) -> None:
         """Verify database connection."""
@@ -79,8 +81,9 @@ class DatabaseConnection:
                 await conn.execute(text("SELECT 1"))
             logger.info("Database connection verified successfully")
         except Exception as e:
-            logger.error("Failed to verify database connection: %s", str(e))
-            raise ConnectionError("Failed to verify database connection") from e
+            logger.exception("Failed to verify database connection")
+            error_msg = "Failed to verify database connection"
+            raise DBConnectionError(error_msg) from e
 
     @asynccontextmanager
     async def get_session(self) -> AsyncGenerator[AsyncSession, None]:
@@ -88,9 +91,9 @@ class DatabaseConnection:
         async with self.async_session_maker() as session:
             try:
                 yield session
-            except Exception as e:
+            except Exception:
                 await session.rollback()
-                logger.error("Database session error: %s", str(e))
+                logger.exception("Database session error")
                 raise
             finally:
                 await session.close()

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, Set
+from typing import Final
 
 BYTE_MEGABYTE: Final[int] = 1024 * 1024
 
@@ -14,14 +14,14 @@ class OCRConfig:
     TARGET_SIZE: int = 1240
     MAX_WORKERS: int = 4
     LOG_DIR: Path = Path("/app/data/logs/ocr")
-    ACCEPTED_FILE_TYPES: Set[str] = frozenset(
+    ACCEPTED_FILE_TYPES: frozenset[str] = frozenset(
         {
             "image/jpeg",
             "image/png",
             "image/jpg",
             "image/webp",
             "application/pdf",
-        }
+        },
     )
     PROCESSOR_URL: str = "http://processor:9090/text-preprocess"
     UPLOAD_DIR: Path = Path("/app/data/uploads")

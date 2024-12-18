@@ -1,16 +1,27 @@
 #!/bin/bash
 
+# Selected model.
+MODEL=llama3.2:3b
+# MODEL=gemma2:2b
+
 # Start Ollama in the background.
-/bin/ollama serve &
-# Record Process ID.
-pid=$!
+echo "Starting Ollama server..."
+ollama serve &
+SERVE_PID=$!
 
-# Pause for Ollama to start.
-sleep 5
+echo "Waiting for Ollama server to be active..."
+while ! ollama list | grep -q 'NAME'; do
+  sleep 1
+done
 
-echo "🔴 Retrieve LLAMA3.2 3B model..."
-ollama pull llama3.2:3b
+echo "🔴 Retrieve ${MODEL} model..."
+ollama pull ${MODEL}
+echo "🟢 Done!"
+
+# Preload the model.
+echo "🔴 Preload ${MODEL} model..."
+ollama run ${MODEL} ""
 echo "🟢 Done!"
 
 # Wait for Ollama process to finish.
-wait $pid
+wait $SERVE_PID

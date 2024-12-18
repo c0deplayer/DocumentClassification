@@ -1,22 +1,39 @@
+from __future__ import annotations
+
 import base64
 import io
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import AsyncGenerator, Optional
+from typing import TYPE_CHECKING
 
 import aiofiles
-import requests
-from fastapi import Depends, FastAPI, HTTPException, UploadFile, status
+import aiohttp
+from fastapi import (
+    Depends,
+    FastAPI,
+    HTTPException,
+    UploadFile,
+    status,
+)
 from pdf2image import convert_from_bytes
 from pdf2image.exceptions import PDFPageCountError
 from PIL import Image
-from tesseract import TesseractOCR
+from tesseract_wrapper import TesseractWrapper
 
 from configs.ocr_config import OCRConfig
-from database import DocumentCreate, DocumentError, DocumentRepository, get_repository
-from database.models import Document
+from database import (
+    DocumentCreate,
+    DocumentError,
+    DocumentRepository,
+    get_repository,
+)
 from utils.utils import get_unique_filename
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from database.models import Document
 
 config = OCRConfig()
 config.LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -29,7 +46,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.FileHandler(
-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
+            config.LOG_DIR / f"{datetime.now(tz=datetime.UTC):%Y-%m-%d}.log",
+            mode="a",
         ),
         logging.StreamHandler(),
     ],
@@ -38,25 +56,39 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
-# optimizer = OptimizedOCR(config=config)
-optimizer = TesseractOCR(config=config)
+# optimizer = EasyOCRWrapper(config=config)
+optimizer = TesseractWrapper(config=config)
 
 
 class OCRProcessor:
     """Handle OCR processing operations."""
 
-    def __init__(self, document_repository: DocumentRepository):
+    def __init__(self, document_repository: DocumentRepository) -> None:
         """Initialize OCR processor with repository."""
         self.repository = document_repository
 
-    async def validate_file(self, file: UploadFile) -> Optional[str]:
+    async def validate_file(self, file: UploadFile) -> str:
         """Validate uploaded file against constraints."""
         logger.info("Validating file: %s", file.filename)
+        if not file.filename:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Filename is required",
+            )
         new_filename = file.filename
 
-        if await self.repository.get_by_filename(file.filename, return_bool=True):
-            logger.info("File already exists: %s, making it unique", file.filename)
-            new_filename = await get_unique_filename(file.filename, self.repository)
+        if await self.repository.get_by_filename(
+            file.filename,
+            return_bool=True,
+        ):
+            logger.info(
+                "File already exists: %s, making it unique",
+                file.filename,
+            )
+            new_filename = await get_unique_filename(
+                file.filename,
+                self.repository,
+            )
             logger.info("New unique filename: %s", new_filename)
 
         if file.content_type not in config.ACCEPTED_FILE_TYPES:
@@ -64,6 +96,12 @@ class OCRProcessor:
             raise HTTPException(
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                 detail="Unsupported file type",
+            )
+
+        if not file.size:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Empty file",
             )
 
         if file.size > config.FILE_SIZE_LIMIT:
@@ -82,12 +120,12 @@ class OCRProcessor:
                         status_code=status.HTTP_400_BAD_REQUEST,
                         detail=f"PDF exceeds {config.MAX_PDF_PAGES} pages",
                     )
-            except PDFPageCountError as e:
-                logger.error("PDF processing error: %s", str(e))
+            except PDFPageCountError as err:
+                logger.exception("PDF processing error")
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Invalid or corrupted PDF file",
-                ) from e
+                ) from err
             finally:
                 file.file.seek(0)
 
@@ -109,11 +147,12 @@ class OCRProcessor:
         encoded_images = []
 
         for img in images:
-            if img.mode in ("RGBA", "P"):
-                img = img.convert("RGB")
+            converted_img = img
+            if converted_img.mode in ("RGBA", "P"):
+                converted_img = converted_img.convert("RGB")
 
             with io.BytesIO() as buffer:
-                img.save(buffer, format="JPEG")
+                converted_img.save(buffer, format="JPEG")
                 img_byte_arr = buffer.getvalue()
 
                 encoded = base64.b64encode(img_byte_arr).decode("utf-8")
@@ -124,31 +163,34 @@ class OCRProcessor:
     async def save_document(self, file_name: str) -> Document:
         """Save document metadata to database."""
         try:
-            document = await self.repository.create(
+            return await self.repository.create(
                 DocumentCreate(
                     file_name=file_name,
                     file_path=str(config.UPLOAD_DIR / file_name),
-                )
+                    classification="",
+                    summary="",
+                ),
             )
-            return document
-        except DocumentError as e:
-            logger.error("Failed to save document: %s", str(e))
+        except DocumentError as err:
+            logger.exception("Failed to save document")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Failed to save document",
-            ) from e
+            ) from err
 
 
 @app.get("/documents")
 async def get_docs(
-    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
+    repository: AsyncGenerator[DocumentRepository, None] = Depends(
+        get_repository,
+    ),
 ) -> list[dict]:
     """Get all documents."""
     try:
         documents = await repository.get_all()
         return [doc.to_dict() for doc in documents]
     except DocumentError as e:
-        logger.error("Failed to retrieve documents: %s", str(e))
+        logger.exception("Failed to retrieve documents: %s", str(e))
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to retrieve documents",
@@ -158,7 +200,9 @@ async def get_docs(
 @app.post("/ocr")
 async def process_document(
     file: UploadFile,
-    repository: AsyncGenerator[DocumentRepository, None] = Depends(get_repository),
+    repository: AsyncGenerator[DocumentRepository, None] = Depends(
+        get_repository,
+    ),
 ) -> dict[str, str]:
     """Process document for OCR and forward results."""
     logger.info("Processing document: %s", file.filename)
@@ -194,54 +238,55 @@ async def process_document(
 
         # Forward to processor service
         try:
-            response = requests.post(
-                config.PROCESSOR_URL,
-                json={
-                    "ocr_result": ocr_response.model_dump(exclude={"page_count"})[
-                        "results"
-                    ],
-                    "images": encoded_images,
-                    "file_name": file.filename,
-                },
-                timeout=300,
-            )
+            timeout = aiohttp.ClientTimeout(total=480)
+            async with (
+                aiohttp.ClientSession() as session,
+                session.post(
+                    config.PROCESSOR_URL,
+                    json={
+                        "ocr_result": ocr_response.model_dump(
+                            exclude={"page_count"},
+                        )["results"],
+                        "images": encoded_images,
+                        "file_name": file.filename,
+                    },
+                    timeout=timeout,
+                ) as response,
+            ):
+                response.raise_for_status()
+                return await response.json()
 
-            # If processor request fails, raises HTTPException
-            response.raise_for_status()
-
-            return response.json()
-
-        except (requests.RequestException, HTTPException) as e:
+        except (aiohttp.ClientError, HTTPException) as e:
             await cleanup(repository, document_id, output_file)
-            logger.error("Downstream processing failed: %s", str(e))
+            logger.exception("Downstream processing failed")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Document processing failed in downstream service",
-            )
+            ) from e
 
     except Exception as e:
         await cleanup(repository, document_id, output_file)
-        logger.error("Processing error: %s", str(e))
+        logger.exception("Processing error")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Document processing failed",
-        )
+        ) from e
 
 
 async def cleanup(
     repository: DocumentRepository,
-    document_id: Optional[int],
-    output_file: Optional[Path],
+    document_id: int | None,
+    output_file: Path | None,
 ) -> None:
     """Clean up resources on error."""
     if document_id:
         try:
             await repository.delete(document_id)
         except DocumentError as e:
-            logger.error("Failed to delete document: %s", str(e))
+            logger.exception("Failed to delete document: %s", str(e))
 
     if output_file and output_file.exists():
         try:
             output_file.unlink()
         except OSError as e:
-            logger.error("Failed to delete file: %s", str(e))
+            logger.exception("Failed to delete file: %s", str(e))

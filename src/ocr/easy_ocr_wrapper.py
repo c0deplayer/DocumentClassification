@@ -7,13 +7,20 @@ from numpy.typing import NDArray
 from PIL import Image
 
 from configs.ocr_config import OCRConfig
-from payload.ocr_models import OCRResponse, OCRResult
+from payload.ocr_models import OCRResponse
+from payload.shared_models import OCRResult
 
 
 class ImagePreprocessor:
     """Handle image preprocessing operations."""
 
     def __init__(self, target_size: int) -> None:
+        """Initialize the image preprocessor.
+
+        Args:
+            target_size: Maximum dimension size to resize images to
+
+        """
         self.target_size = target_size
         self._clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
 
@@ -24,15 +31,15 @@ class ImagePreprocessor:
 
         width, height = image.size
         scale = min(self.target_size / width, self.target_size / height)
-        new_size = tuple(int(dim * scale) for dim in (width, height))
+        new_size = (int(width * scale), int(height * scale))
 
         return image.resize(new_size, resample=Image.Resampling.LANCZOS)
 
     def enhance_image(self, image: NDArray[np.uint8]) -> NDArray[np.uint8]:
         """Apply image enhancement techniques."""
         enhanced = self._clahe.apply(image)
-
-        return cv2.fastNlMeansDenoising(enhanced)
+        denoised = cv2.fastNlMeansDenoising(enhanced)
+        return np.array(denoised, dtype=np.uint8)
 
     def preprocess(self, image: Image.Image) -> NDArray[np.uint8]:
         """Complete image preprocessing pipeline."""
@@ -45,7 +52,7 @@ class ImagePreprocessor:
         return self.enhance_image(image_array)
 
 
-class OptimizedOCR:
+class EasyOCRWrapper:
     """Optimized OCR processing with performance enhancements."""
 
     def __init__(self, config: OCRConfig) -> None:
@@ -83,11 +90,12 @@ class OptimizedOCR:
                 for bbox, word, _ in results
             ]
         except Exception as e:
-            logging.error("Error processing image: %s", str(e))
+            logging.exception("Error processing image: %s", str(e))
             return []
 
     def process_batch(
-        self, images: list[Image.Image]
+        self,
+        images: list[Image.Image],
     ) -> tuple[OCRResponse, list[Image.Image]]:
         """Process multiple images in optimized batch."""
         processed = [self.preprocessor.preprocess(image) for image in images]

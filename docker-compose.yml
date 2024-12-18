@@ -4,13 +4,13 @@ services:
     image: postgres:latest
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 120s
       timeout: 5s
       retries: 5
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD environment variable is required}
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: document_classification
       TZ: Europe/Warsaw
     ports:
@@ -85,6 +85,7 @@ services:
     depends_on:
       - processor
       - database
+      - ollama
     volumes:
       - type: bind
         source: logs
@@ -111,13 +112,14 @@ services:
         source: init-ollama.sh
         target: /app/init-ollama.sh
     healthcheck:
-      test: ollama ps || exit 1
-      interval: 5s
-      timeout: 5s
+      test: "ollama --version && ollama ps || exit 1"
+      interval: 120s
+      timeout: 10s
       retries: 5
+      start_period: 30s
     networks:
       - document-classification
-    entrypoint: [ "/usr/bin/bash", "/app/init-ollama.sh" ]
+    entrypoint: ["/usr/bin/bash", "/app/init-ollama.sh"]
 
   summarizer:
     container_name: summarizer_service

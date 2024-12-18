@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import psutil
@@ -29,4 +29,6 @@ class SummarizationConfig:
     # Llama specific parameters
     NUM_CTX: int = 4096  # Context window size
     NUM_GPU: int = 0
-    NUM_THREAD: int = psutil.cpu_count(logical=False)  # Number of CPU threads to use
+    NUM_THREAD: int = field(
+        default_factory=lambda: psutil.cpu_count(logical=False) or 1,
+    )

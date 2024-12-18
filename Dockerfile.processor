@@ -1,33 +1,39 @@
-FROM ghcr.io/astral-sh/uv:latest AS builder
 FROM python:3.12-slim-bullseye AS final
 
-ENV VIRTUAL_ENV=/opt/venv
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+ENV UV_PYTHON_DOWNLOADS=never
+# Location of the virtual environment
+ENV UV_PROJECT_ENVIRONMENT="/venv"
+# Location of the python installation via uv
+ENV UV_PYTHON_INSTALL_DIR="/python"
+# Byte compile the python files on installation
+ENV UV_COMPILE_BYTECODE=1
+# Python verision to use
+ENV UV_PYTHON=python3.12
+# Tweaking the PATH variable for easier use
+ENV PATH="$UV_PROJECT_ENVIRONMENT/bin:$PATH"
 
 WORKDIR /app
 
 # Install minimal required dependencies
 RUN apt-get update && \
-  apt-get install -y --no-install-recommends \
-  git \
-  && rm -rf /var/lib/apt/lists/*
-
-# Create and activate virtual environment
-RUN python -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+    apt-get install -y --no-install-recommends \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies using uv
-COPY --from=builder /uv /uv
-COPY requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/uv \
-  /uv pip install --no-cache-dir -r requirements.txt
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-editable
 
 # Copy only necessary files
 COPY src/processor/ /app/code/
 COPY src/configs/processor_config.py /app/code/configs/
 COPY src/payload/processor_models.py /app/code/payload/
+COPY src/payload/shared_models.py /app/code/payload/
 
 WORKDIR /app/code/
 
-CMD ["python", "-m", "uvicorn", "processor:app", "--host", "0.0.0.0", "--port", "9090"]
+CMD ["uv", "run", "uvicorn", "processor:app", "--host", "0.0.0.0", "--port", "9090"]

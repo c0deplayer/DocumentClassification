@@ -1,16 +1,22 @@
+from __future__ import annotations
+
 import base64
 import io
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING
 
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from transformers import ProcessorMixin
 
 from configs.processor_config import ProcessorConfig
-from payload.processor_models import OCRResult, ProcessorInput
+
+if TYPE_CHECKING:
+    from transformers import ProcessorMixin
+
+    from payload.processor_models import ProcessorInput
+    from payload.shared_models import OCRResult
 
 config = ProcessorConfig()
 config.LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -21,7 +27,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     handlers=[
         logging.FileHandler(
-            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log", mode="a"
+            config.LOG_DIR / f"{datetime.now():%Y-%m-%d}.log",
+            mode="a",
         ),
         logging.StreamHandler(),
     ],
@@ -38,24 +45,27 @@ class DocumentClassificationDataset(Dataset):
         processor: ProcessorMixin,
         data: ProcessorInput,
         config: ProcessorConfig,
-        labels: Optional[list[int]] = None,
+        labels: list[int] | None = None,
         *,
-        encodings: Optional[dict[str, torch.Tensor]] = None,
+        encodings: dict[str, torch.Tensor] | None = None,
     ) -> None:
-        """
-        Initialize document classification dataset.
+        """Initialize document classification dataset.
 
         Args:
             processor: LayoutLMv3 processor instance
             data: Validated input data
             config: Processing configuration
             labels: Optional classification labels
+            encodings: Pre-computed encodings (optional)
+
         """
         self.processor = processor
         self.config = config
         self.labels = labels
         self.encodings = (
-            encodings if encodings is not None else self._prepare_encodings(data)
+            encodings
+            if encodings is not None
+            else self._prepare_encodings(data)
         )
 
     @classmethod
@@ -65,8 +75,7 @@ class DocumentClassificationDataset(Dataset):
         data: ProcessorInput,
         config: ProcessorConfig,
     ) -> dict[str, torch.Tensor]:
-        """
-        Get document encodings without instantiating the full dataset.
+        """Get document encodings without instantiating the full dataset.
 
         This method processes the input data and returns only the encodings,
         which is useful when you don't need the full dataset functionality.
@@ -81,6 +90,7 @@ class DocumentClassificationDataset(Dataset):
 
         Raises:
             ValueError: If encoding preparation fails
+
         """
         temp_instance = cls(
             processor=processor,
@@ -89,23 +99,36 @@ class DocumentClassificationDataset(Dataset):
             encodings={},
         )
 
-        return temp_instance._prepare_encodings(data)
+        return temp_instance.prepare_encodings(data)
 
-    def _prepare_encodings(self, data: ProcessorInput) -> dict[str, torch.Tensor]:
+    def _check_images(self, images: list[Image.Image]) -> None:
+        """Check if images are valid."""
+        if not images:
+            error_msg = "No valid images found in input data"
+            raise ValueError(error_msg)
+
+    def prepare_encodings(
+        self,
+        data: ProcessorInput,
+    ) -> dict[str, torch.Tensor]:
         """Prepare encodings from input data for multiple pages."""
         try:
             images = self._decode_images(data.images)
-            if not images:
-                raise ValueError("No valid images found in input data")
+            self._check_images(images)
 
             scales = self._calculate_scales(images[0].size)
             words_per_page, boxes_per_page = self._prepare_ocr_data(
-                data.ocr_result, scales
+                data.ocr_result,
+                scales,
             )
 
             # Process each page separately
             page_encodings = []
-            for img, words, boxes in zip(images, words_per_page, boxes_per_page):
+            for img, words, boxes in zip(
+                images,
+                words_per_page,
+                boxes_per_page,
+            ):
                 encoding = self.processor(
                     [img],  # Processor expects a list of images
                     words,
@@ -120,14 +143,20 @@ class DocumentClassificationDataset(Dataset):
             # Combine encodings from all pages
             combined_encodings = {
                 "input_ids": torch.cat(
-                    [enc["input_ids"] for enc in page_encodings], dim=0
+                    [enc["input_ids"] for enc in page_encodings],
+                    dim=0,
                 ),
                 "attention_mask": torch.cat(
-                    [enc["attention_mask"] for enc in page_encodings], dim=0
+                    [enc["attention_mask"] for enc in page_encodings],
+                    dim=0,
                 ),
-                "bbox": torch.cat([enc["bbox"] for enc in page_encodings], dim=0),
+                "bbox": torch.cat(
+                    [enc["bbox"] for enc in page_encodings],
+                    dim=0,
+                ),
                 "pixel_values": torch.cat(
-                    [enc["pixel_values"] for enc in page_encodings], dim=0
+                    [enc["pixel_values"] for enc in page_encodings],
+                    dim=0,
                 ),
             }
 
@@ -136,11 +165,12 @@ class DocumentClassificationDataset(Dataset):
                 {k: v.shape for k, v in combined_encodings.items()},
             )
 
-            return combined_encodings
-
         except Exception as e:
+            error_msg = f"Encoding preparation failed: {e!s}"
             logger.exception("Error preparing encodings")
-            raise ValueError(f"Encoding preparation failed: {str(e)}") from e
+            raise ValueError(error_msg) from e
+        else:
+            return combined_encodings
 
     @staticmethod
     def _decode_images(encoded_images: list[str]) -> list[Image.Image]:
@@ -150,7 +180,10 @@ class DocumentClassificationDataset(Dataset):
             for img in encoded_images
         ]
 
-    def _calculate_scales(self, image_size: tuple[int, int]) -> tuple[float, float]:
+    def _calculate_scales(
+        self,
+        image_size: tuple[int, int],
+    ) -> tuple[float, float]:
         """Calculate scaling factors for image resizing."""
         width, height = image_size
         logger.debug("Image size: %s", image_size)
@@ -162,7 +195,8 @@ class DocumentClassificationDataset(Dataset):
 
     @staticmethod
     def _prepare_ocr_data(
-        ocr_results: list[list[OCRResult]], scales: tuple[float, float]
+        ocr_results: list[list[OCRResult]],
+        scales: tuple[float, float],
     ) -> tuple[list[str], list[list[int]]]:
         """Prepare OCR data with scaling."""
         if not ocr_results:
@@ -179,7 +213,8 @@ class DocumentClassificationDataset(Dataset):
                 scaled_box = [
                     int(coord * scale)
                     for coord, scale in zip(
-                        result.bounding_box, [width_scale, height_scale] * 2
+                        result.bounding_box,
+                        [width_scale, height_scale] * 2,
                     )
                 ]
                 tmp_box.append(scaled_box)
