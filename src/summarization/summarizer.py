@@ -34,7 +34,22 @@ app = FastAPI()
 
 
 class OllamaOptions(TypedDict):
-    """Type definition for Ollama API options."""
+    """A TypedDict class representing configuration options for Ollama API.
+
+    Attributes:
+        temperature (float): Controls randomness in the response. Higher values (e.g., 0.8) make the output more random,
+                            while lower values (e.g., 0.2) make it more focused and deterministic.
+        top_p (float): Controls diversity via nucleus sampling. Restricts cumulative probability of tokens considered
+                       for sampling. Range 0.0-1.0.
+        frequency_penalty (float): Reduces likelihood of repeated tokens. Positive values discourage repetition while
+                                 negative values encourage it.
+        presence_penalty (float): Influences likelihood of discussing new topics. Positive values encourage covering
+                                new topics while negative values focus on existing ones.
+        num_ctx (int): Sets the size of the context window (in tokens) for the model's input/output.
+        num_gpu (int): Specifies the number of GPUs to utilize for model inference.
+        num_thread (int): Defines the number of CPU threads to use for processing.
+
+    """
 
     temperature: float
     top_p: float
@@ -46,7 +61,19 @@ class OllamaOptions(TypedDict):
 
 
 class OllamaRequest(TypedDict, total=False):
-    """Type definition for Ollama API request."""
+    """A TypedDict class representing a request to the Ollama API.
+
+    Attributes:
+        model (str): The name of the model to use for the request. Required.
+        prompt (str): The prompt text to send to the model. Required.
+        format (str, optional): The desired output format.
+        options (OllamaOptions, optional): Additional options for the model.
+        system (str, optional): System prompt to modify model behavior.
+        stream (bool, optional): Whether to stream the response.
+        raw (bool, optional): Whether to return raw response.
+        keep_alive (Union[str, int], optional): Duration to keep the model loaded.
+
+    """
 
     model: str  # required
     prompt: str  # required
@@ -59,7 +86,38 @@ class OllamaRequest(TypedDict, total=False):
 
 
 class Summarizer:
-    """Text summarization using direct Ollama integration."""
+    """A class for generating text summaries using the Ollama API.
+
+    This class handles the preparation, validation, and processing of text summarization
+    requests through the Ollama API. It includes functionality for JSON response parsing,
+    error handling, and content validation.
+
+    Attributes:
+        SUMMARY_SYSTEM_PROMPT (str): Template for system-level instructions to the model.
+        SUMMARY_PROMPT (str): Template for the main summarization prompt.
+        config (SummarizationConfig): Configuration settings for the summarizer.
+        base_url (str): Base URL for the Ollama API endpoint.
+
+    Example:
+        ```python
+        config = SummarizationConfig()
+        summarizer = Summarizer(config)
+        summary = await summarizer.generate_summary(
+            text="Long text to summarize",
+            min_length=100,
+            max_length=300,
+            classification="technical"
+        ```
+
+    Note:
+        The class expects the Ollama API to be available and properly configured.
+        It handles responses in JSON format and includes fallback mechanisms for
+        non-JSON responses.
+
+        HTTPException: When API communication fails or response validation fails.
+        ValueError: When response format or content validation fails.
+
+    """
 
     SUMMARY_SYSTEM_PROMPT = """You are an expert summarization analyst specializing in precise content distillation.
 
@@ -118,7 +176,20 @@ class Summarizer:
     Generate summary:"""
 
     def __init__(self, config: SummarizationConfig) -> None:
-        """Initialize summarizer with configuration."""
+        """Initialize the summarizer with configuration settings.
+
+        Args:
+            config (SummarizationConfig): Configuration object containing settings for summarization,
+                including OLLAMA_BASE_URL for API endpoint.
+
+        Returns:
+            None
+
+        Example:
+            >>> config = SummarizationConfig(OLLAMA_BASE_URL="http://localhost:11434")
+            >>> summarizer = Summarizer(config)
+
+        """
         self.config = config
         self.base_url = f"{config.OLLAMA_BASE_URL}/api/generate"
 
@@ -129,7 +200,29 @@ class Summarizer:
         max_length: int,
         classification: str,
     ) -> OllamaRequest:
-        """Prepare the request payload for Ollama API."""
+        """Prepare a request for the Ollama API to generate a summary of the given text.
+
+        This method constructs a request dictionary with the necessary parameters for text summarization,
+        including system and user prompts, model configuration, and various generation parameters.
+
+        Args:
+            text (str): The input text to be summarized.
+            min_length (int): The minimum length of the generated summary.
+            max_length (int): The maximum length of the generated summary.
+            classification (str): The classification category of the text.
+
+        Returns:
+            OllamaRequest: A dictionary containing all necessary parameters for the Ollama API request,
+            including:
+                - model: The name of the language model to use
+                - prompt: The formatted user prompt
+                - system: The formatted system prompt
+                - format: The expected response format (json)
+                - stream: Whether to stream the response
+                - options: Model-specific parameters (temperature, top_p, etc.)
+                - keep_alive: Duration to keep the model loaded
+
+        """
         system_prompt = self.SUMMARY_SYSTEM_PROMPT.format(
             min_length=min_length,
             max_length=max_length,
@@ -162,16 +255,25 @@ class Summarizer:
         }
 
     def _extract_json_from_text(self, text: str) -> dict[str, Any]:
-        """Extract JSON from text that might contain additional content.
+        r"""Extract a JSON object from a text string.
+
+        This method processes the input text by removing any markdown JSON code block markers
+        and attempts to parse the first JSON object found in the text.
 
         Args:
-            text: Text that might contain JSON
+            text (str): The input text containing a JSON object, potentially within markdown code blocks.
 
         Returns:
-            Extracted JSON as dict
+            dict[str, Any]: The parsed JSON object as a dictionary.
 
         Raises:
-            ValueError: If no valid JSON found
+            ValueError: If no JSON object is found in the text or if the JSON parsing fails.
+
+        Example:
+            >>> text = "```json\\n{\\\"key\\\": \\\"value\\\"}\\n```"
+            >>> result = _extract_json_from_text(text)
+            >>> print(result)
+            {'key': 'value'}
 
         """
         # Remove any markdown code blocks

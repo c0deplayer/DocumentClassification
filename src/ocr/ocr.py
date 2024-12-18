@@ -111,11 +111,47 @@ class OCRProcessor:
     """Handle OCR processing operations."""
 
     def __init__(self, document_repository: DocumentRepository) -> None:
+        """Initialize OCR processor with repository.
+
+        Args:
+            document_repository (DocumentRepository): The repository instance for document storage and retrieval.
+
+        Returns:
+            None
+
+        """
         """Initialize OCR processor with repository."""
         self.repository = document_repository
 
     async def validate_file(self, file: UploadFile) -> str:
-        """Validate uploaded file against constraints."""
+        """Validate uploaded file against constraints.
+
+        This method performs several validation checks on the uploaded file:
+        1. Validates filename existence
+        2. Ensures filename uniqueness
+        3. Validates file type against accepted types
+        4. Checks file size constraints
+        5. For PDFs: validates page count
+
+        Args:
+            file (UploadFile): The file object to validate, containing attributes like
+                filename, content_type, size, and file stream.
+
+        Returns:
+            str: The validated filename (potentially modified for uniqueness)
+
+        Raises:
+            HTTPException: With appropriate status codes for validation failures:
+                - 400: Missing filename, empty file, or invalid PDF
+                - 413: File size exceeds limit
+                - 415: Unsupported media type
+
+        Example:
+            ```
+            validated_filename = await ocr_instance.validate_file(uploaded_file)
+            ```
+
+        """
         logger.info("Validating file: %s", file.filename)
         if not file.filename:
             raise HTTPException(
@@ -180,7 +216,19 @@ class OCRProcessor:
 
     @staticmethod
     def convert_file_to_images(file: UploadFile) -> list[Image.Image]:
-        """Convert uploaded file to list of PIL Images."""
+        """Convert uploaded file to list of PIL Images.
+
+        This function takes an uploaded file and converts it into a list of PIL Image objects.
+        For PDF files, it converts each page into a separate image. For other image files,
+        it returns a single image in a list.
+
+        Args:
+            file (UploadFile): The uploaded file object containing either a PDF or image file.
+
+        Returns:
+            list[Image.Image]: A list of PIL Image objects representing the file contents.
+
+        """
         logger.info("Converting file to images: %s", file.filename)
 
         if file.content_type == "application/pdf":
@@ -190,7 +238,22 @@ class OCRProcessor:
 
     @staticmethod
     def convert_to_base64(images: list[Image.Image]) -> list[str]:
-        """Convert PIL Images to base64 strings."""
+        """Convert PIL Images to base64 strings.
+
+        This function takes a list of PIL Image objects and converts each image to a base64-encoded string.
+        Images in RGBA or P mode are converted to RGB before encoding. Each image is saved in JPEG format.
+
+        Args:
+            images (list[Image.Image]): A list of PIL Image objects to be converted
+
+        Returns:
+            list[str]: A list of base64-encoded strings representing the images
+
+        Example:
+            >>> images = [Image.open('image1.png'), Image.open('image2.jpg')]
+            >>> base64_strings = convert_to_base64(images)
+
+        """
         encoded_images = []
 
         for img in images:
@@ -208,7 +271,18 @@ class OCRProcessor:
         return encoded_images
 
     async def save_document(self, file_name: str) -> Document:
-        """Save document metadata to database."""
+        """Save document metadata to database.
+
+        Args:
+            file_name (str): Name of the document file to be saved
+
+        Returns:
+            Document: Created document instance with metadata
+
+        Raises:
+            HTTPException: If document creation fails with 500 status code
+
+        """
         try:
             return await self.repository.create(
                 DocumentCreate(
@@ -232,7 +306,25 @@ async def get_docs(
         get_repository,
     ),
 ) -> list[dict]:
-    """Get all documents."""
+    """Asynchronously retrieves all documents from the repository.
+
+    Args:
+        repository (AsyncGenerator[DocumentRepository, None]): An async generator that yields a DocumentRepository instance.
+            Defaults to the repository provided by get_repository dependency.
+
+    Returns:
+        list[dict]: A list of documents, where each document is represented as a dictionary.
+
+    Raises:
+        HTTPException: If there's an error retrieving documents from the repository.
+            Returns a 500 Internal Server Error status code.
+
+    Example:
+        >>> async def example():
+        ...     docs = await get_docs()
+        ...     print(docs)  # [{doc1_data}, {doc2_data}, ...]
+
+    """
     try:
         documents = await repository.get_all()
         return [doc.to_dict() for doc in documents]
@@ -251,7 +343,35 @@ async def process_document(
         get_repository,
     ),
 ) -> dict[str, str]:
-    """Process document for OCR and forward results."""
+    """Process and analyze an uploaded document through OCR and subsequent processing.
+
+    This asynchronous function handles document upload, encryption, OCR processing, and forwards
+    the results to a downstream processing service.
+
+    Args:
+        file (UploadFile): The uploaded file to be processed
+        repository (AsyncGenerator[DocumentRepository, None]): Repository dependency for document storage
+
+    Returns:
+        dict[str, str]: JSON response from the downstream processing service
+
+    Raises:
+        HTTPException: With status code 500 if:
+            - Document processing fails in downstream service
+            - Any other processing error occurs
+
+    Flow:
+        1. Validates and saves uploaded file
+        2. Encrypts the saved file
+        3. Performs OCR on file contents
+        4. Saves initial document record
+        5. Forwards OCR results to processor service
+        6. Returns processor service response
+
+    Note:
+        The function includes built-in cleanup in case of failures at any stage
+
+    """
     logger.info("Processing document: %s", file.filename)
 
     processor = OCRProcessor(repository)
