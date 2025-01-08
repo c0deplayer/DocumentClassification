@@ -391,19 +391,16 @@ async def process_document(
             while content := await file.read(1024):  # async read chunk
                 await out_file.write(content)  # async write chunk
 
-        # Initialize encryption for this file
-        temp_encrypted_file = output_file.with_suffix(
-            output_file.suffix + ".encrypted",
-        )
-
         # Encrypt the file
-        await cipher.encrypt_file(output_file, temp_encrypted_file)
+        await cipher.encrypt_file(output_file)
 
         # Replace original with encrypted version
         if output_file.exists():
             output_file.unlink()
 
-        Path(temp_encrypted_file).rename(output_file)
+        Path(output_file.with_suffix(".tmp")).rename(output_file)
+
+        # Path(temp_encrypted_file).rename(output_file)
 
         # For debugging purposes decrypt the file
         # await cipher.decrypt_file(output_file, tmp_decrypted_file)
@@ -417,12 +414,14 @@ async def process_document(
 
         images = processor.convert_file_to_images(file)
 
+        logger.info("New file name: %s", output_file.name)
+
         # Perform OCR
         ocr_response, preprocessed_images = optimizer.process_batch(images)
         encoded_images = processor.convert_to_base64(preprocessed_images)
 
         # Save initial document record
-        document = await processor.save_document(file.filename)
+        document = await processor.save_document(output_file.name)
         document_id = document.id
 
         # Forward to processor service
@@ -437,7 +436,7 @@ async def process_document(
                             exclude={"page_count"},
                         )["results"],
                         "images": encoded_images,
-                        "file_name": file.filename,
+                        "file_name": output_file.name,
                     },
                     timeout=timeout,
                 ) as response,

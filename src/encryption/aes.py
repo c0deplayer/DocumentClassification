@@ -64,7 +64,7 @@ class AESCipher:
     async def encrypt_file(
         self,
         input_file: PathLike,
-        output_file: PathLike,
+        output_file: PathLike | None = None,
     ) -> None:
         """Encrypts a file using AES encryption in CBC mode.
 
@@ -90,6 +90,9 @@ class AESCipher:
 
         """
         """Encrypt file in chunks to handle large files."""
+        if output_file is None:
+            output_file = input_file.with_suffix(".tmp")
+
         iv = get_random_bytes(AES.block_size)
         cipher = AES.new(self.key, AES.MODE_CBC, iv)
 
@@ -125,9 +128,7 @@ class AESCipher:
 
         """
         if output_file is None:
-            output_file = input_file.with_suffix(
-                input_file.suffix + ".decrypted",
-            )
+            output_file = input_file.with_suffix(".tmp")
 
         async with aiofiles.open(input_file, "rb") as in_f:
             # Read IV first

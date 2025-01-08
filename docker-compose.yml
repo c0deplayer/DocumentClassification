@@ -28,6 +28,29 @@ services:
         source: ./db/init.sql
         target: /docker-entrypoint-initdb.d/create_tables.sql
 
+  web:
+      container_name: web_interface
+      build:
+        context: .
+        dockerfile: Dockerfile.web
+      environment:
+        FLASK_APP: app.py
+        FLASK_ENV: development
+        FLASK_DEBUG: 1
+      ports:
+        - "5050:5050"
+      networks:
+        - document-classification
+      depends_on:
+        - database
+      volumes:
+        - type: bind
+          source: logs
+          target: /app/data/logs
+        - type: volume
+          source: file_storage
+          target: /app/data/uploads
+
   ocr:
     container_name: ocr_service
     # image: c0deplayer/dc-ocr:main

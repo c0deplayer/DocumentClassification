@@ -1,0 +1,235 @@
+{% extends "base.html.j2" %}
+
+{% block title %}Statistics{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="mb-4">Document Statistics</h1>
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Total Documents</h5>
+                    <p class="card-text display-6">{{ total_docs }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Unclassified</h5>
+                    <p class="card-text display-6">{{ unclassified }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">No Summary</h5>
+                    <p class="card-text display-6">{{ no_summary }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h5 class="card-title">Categories</h5>
+                    <p class="card-text display-6">{{ classification_data|length }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Summary Statistics</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-hover table-striped">
+                        <tbody>
+                            <tr>
+                                <td>Documents with Summary</td>
+                                <td class="text-end">{{ summary_stats.count }}</td>
+                            </tr>
+                            <tr>
+                                <td>Average Summary Length</td>
+                                <td class="text-end">{{ summary_stats.avg_length }} words</td>
+                            </tr>
+                            <tr>
+                                <td>Median Summary Length</td>
+                                <td class="text-end">{{ summary_stats.median_length }} words</td>
+                            </tr>
+                            <tr>
+                                <td>Shortest Summary</td>
+                                <td class="text-end">{{ summary_stats.min_length }} words</td>
+                            </tr>
+                            <tr>
+                                <td>Longest Summary</td>
+                                <td class="text-end">{{ summary_stats.max_length }} words</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Classification Trends</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="classificationTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="row">
+        <!-- Classification Distribution -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Classification Distribution</h5>
+                    <canvas id="classificationChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Daily Documents -->
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Documents per Day (Last 30 Days)</h5>
+                    <canvas id="dailyChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Classification Distribution Chart
+        const classificationCtx = document.getElementById('classificationChart').getContext('2d');
+        new Chart(classificationCtx, {
+            type: 'pie',
+            data: {
+                labels: {{ classification_data.keys() | list | tojson }},
+        datasets: [{
+            data: {{ classification_data.values() | list | tojson }},
+        backgroundColor: [
+            '#FF6384',
+            '#36A2EB',
+            '#FFCE56',
+            '#4BC0C0',
+            '#9966FF',
+            '#FF9F40',
+            '#FF6384',
+            '#36A2EB'
+        ]
+            }]
+        },
+        options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                position: 'bottom'
+            }
+        }
+    }
+    });
+
+    // Daily Documents Chart
+    const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+    new Chart(dailyCtx, {
+        type: 'line',
+        data: {
+            labels: {{ daily_data| map(attribute = 0) | map('format_date') | list | tojson }},
+        datasets: [{
+            label: 'Documents',
+            data: {{ daily_data| map(attribute = 1) | list | tojson }},
+        borderColor: '#36A2EB',
+        tension: 0.1,
+        fill: true
+        }]
+    },
+        options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    stepSize: 1
+                }
+            }
+        }
+    }
+});
+
+    const trendCtx = document.getElementById('classificationTrendChart').getContext('2d');
+    const monthlyData = {{ class_by_month| tojson }};
+    const categories = [...new Set(Object.values(monthlyData).flatMap(obj => Object.keys(obj)))];
+    const months = Object.keys(monthlyData);
+
+    const datasets = categories.map((category, index) => ({
+        label: category,
+        data: months.map(month => monthlyData[month][category] || 0),
+        borderColor: [
+            '#FF6384',
+            '#36A2EB',
+            '#FFCE56',
+            '#4BC0C0',
+            '#9966FF',
+            '#FF9F40'
+        ][index % 6],
+        fill: false,
+        tension: 0.1
+    }));
+
+    new Chart(trendCtx, {
+        type: 'line',
+        data: {
+            labels: months,
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+});
+</script>
+
+<style>
+    .card {
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    }
+
+    .display-6 {
+        font-size: 2.5rem;
+        font-weight: 300;
+        line-height: 1.2;
+    }
+</style>
+{% endblock %}
