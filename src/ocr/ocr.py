@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import logging
 import os
+from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -22,6 +24,7 @@ from pdf2image import convert_from_bytes
 from pdf2image.exceptions import PDFPageCountError
 from PIL import Image
 from tesseract_wrapper import TesseractWrapper
+from watcher import DocumentWatcher
 
 from configs.ocr_config import OCRConfig
 from database import (
@@ -57,10 +60,6 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
-
-app = FastAPI()
-optimizer = TesseractWrapper(config=config)
-
 load_dotenv()
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
 if not ENCRYPTION_KEY:
@@ -71,6 +70,29 @@ KEY = base64.b64decode(ENCRYPTION_KEY)
 
 
 cipher = AESCipher(KEY)
+
+# Add watch directory to config
+config.WATCH_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """Manage the lifespan of the FastAPI application."""
+    service_url = "http://localhost:8080"
+    app.state.document_watcher = DocumentWatcher(config.WATCH_DIR, service_url)
+    task = asyncio.create_task(app.state.document_watcher.start())
+    logger.info("Started document watcher for directory: %s", config.WATCH_DIR)
+
+    yield  # Startup finished, now wait for shutdown
+
+    if hasattr(app.state, "document_watcher"):
+        await app.state.document_watcher.stop()
+        logger.info("Stopped document watcher")
+    task.cancel()
+
+
+app = FastAPI(lifespan=lifespan)
+optimizer = TesseractWrapper(config=config)
 
 
 class OCRProcessor:

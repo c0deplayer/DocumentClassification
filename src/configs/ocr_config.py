@@ -23,6 +23,7 @@ class OCRConfig:
             "application/pdf",
         },
     )
+    WATCH_DIR: Path = Path("/app/data/watch")
     PROCESSOR_URL: str = "http://processor:9090/text-preprocess"
     UPLOAD_DIR: Path = Path("/app/data/uploads")
     LOG_LEVEL: str = "DEBUG"

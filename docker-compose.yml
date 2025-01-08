@@ -75,6 +75,9 @@ services:
       - type: volume
         source: file_storage
         target: /app/data/uploads
+      - type: bind
+        source: ./watch
+        target: /app/data/watch
 
   processor:
     container_name: processor_service
